@@ -101,7 +101,26 @@ const DEFAULT_GALLERY = [
     { id: 12, title: "Foto Bersama Formasi Lengkap", category: "event", color: "d63031", image: null }
 ];
 
-// ── STORAGE HELPERS ──────────────────────────────────────────
+// ── API & STORAGE HELPERS ────────────────────────────────────
+async function apiCall(endpoint, method = 'GET', body = null) {
+    try {
+        const options = { method, headers: {} };
+        if (body) {
+            options.headers['Content-Type'] = 'application/json';
+            options.body = JSON.stringify(body);
+        }
+        const res = await fetch(`api/${endpoint}`, options);
+        if (res.ok) return await res.json();
+        return null;
+    } catch (e) { console.error('API Error:', e); return null; }
+}
+
+async function getApiData(endpoint, defaults) {
+    const res = await apiCall(endpoint);
+    return (res && res.data) ? res.data : (JSON.parse(localStorage.getItem('xrpl_' + endpoint + '_db')) || defaults);
+}
+
+// Fallback legacy (untuk yang belum ter-migrate API atau guestbook old style)
 function getData(key, defaults) {
     const raw = localStorage.getItem('xrpl_' + key);
     if (!raw) { localStorage.setItem('xrpl_' + key, JSON.stringify(defaults)); return JSON.parse(JSON.stringify(defaults)); }
@@ -198,11 +217,14 @@ function getImgSrc(s, type = 'student') {
 }
 
 // ── OVERVIEW ──────────────────────────────────────────────────
-function updateOverview() {
-    const students = getData('students_db', DEFAULT_STUDENTS);
-    const projects = getData('projects_db', DEFAULT_PROJECTS);
-    const gallery  = getData('gallery_db', DEFAULT_GALLERY);
-    const guestbook = JSON.parse(localStorage.getItem('xrpl_guestbook') || '[]');
+async function updateOverview() {
+    const [students, projects, gallery, gbRes] = await Promise.all([
+        getApiData('students', DEFAULT_STUDENTS),
+        getApiData('projects', DEFAULT_PROJECTS),
+        getApiData('gallery', DEFAULT_GALLERY),
+        apiCall('guestbook')
+    ]);
+    const guestbook = (gbRes && gbRes.data) ? gbRes.data : JSON.parse(localStorage.getItem('xrpl_guestbook') || '[]');
 
     document.getElementById('ov-students').textContent = students.length;
     document.getElementById('ov-projects').textContent = projects.length;
@@ -214,13 +236,13 @@ function updateOverview() {
     document.getElementById('info-projects').textContent = projects.length;
 
     const recentEl = document.getElementById('ov-recent-messages');
-    const recent = guestbook.slice().reverse().slice(0, 4);
+    const recent = guestbook.slice().slice(0, 4); // guestbook API returns sorted DESC
     if (recent.length === 0) {
         recentEl.innerHTML = '<p class="text-gray-500 text-sm italic text-center py-6">Belum ada pesan</p>';
     } else {
         recentEl.innerHTML = recent.map(m => `
             <div class="flex gap-3 items-start border border-white/5 rounded-xl p-3">
-                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyber-blue/30 to-electric-purple/30 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">${m.name[0].toUpperCase()}</div>
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyber-blue/30 to-electric-purple/30 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">${(m.name||'?')[0].toUpperCase()}</div>
                 <div class="min-w-0">
                     <div class="flex items-baseline gap-2"><span class="text-white text-sm font-semibold">${escHtml(m.name)}</span><span class="text-gray-500 text-xs">${m.date}</span></div>
                     <p class="text-gray-400 text-xs mt-0.5 truncate">${escHtml(m.text)}</p>
@@ -231,12 +253,14 @@ function updateOverview() {
 }
 
 // ── STUDENTS ──────────────────────────────────────────────────
-function loadStudents() {
-    const students = getData('students_db', DEFAULT_STUDENTS);
-    renderStudents(students);
+let cachedStudents = [];
+
+async function loadStudents() {
+    cachedStudents = await getApiData('students', DEFAULT_STUDENTS);
+    renderStudents(cachedStudents);
     document.getElementById('search-students').oninput = function() {
         const term = this.value.toLowerCase();
-        renderStudents(students.filter(s => s.name.toLowerCase().includes(term)));
+        renderStudents(cachedStudents.filter(s => s.name.toLowerCase().includes(term)));
     };
 }
 
@@ -291,7 +315,7 @@ function openStudentModal(studentId = null) {
     setStudentColor('00d4ff', document.querySelector('.color-pick[data-color="00d4ff"]'));
 
     if (studentId) {
-        const s = getData('students_db', DEFAULT_STUDENTS).find(x => x.id === studentId);
+        const s = cachedStudents.find(x => x.id === studentId);
         if (!s) return;
         document.getElementById('student-id').value = s.id;
         document.getElementById('student-name').value = s.name;
@@ -338,9 +362,9 @@ function setStudentColor(color, el) {
     if (el) el.style.borderColor = '#fff';
 }
 
-document.getElementById('student-form').addEventListener('submit', function(e) {
+document.getElementById('student-form').addEventListener('submit', async function(e) {
     e.preventDefault();
-    const students = getData('students_db', DEFAULT_STUDENTS);
+    const btn = document.querySelector('#student-form button[type="submit"]');
     const id = parseInt(document.getElementById('student-id').value);
     const data = {
         name: document.getElementById('student-name').value.trim(),
@@ -352,25 +376,27 @@ document.getElementById('student-form').addEventListener('submit', function(e) {
     };
     if (!data.name) return showToast('Nama murid wajib diisi!', 'error');
 
+    btn.disabled = true;
     if (id) {
-        const idx = students.findIndex(s => s.id === id);
-        if (idx > -1) students[idx] = { ...students[idx], ...data };
+        data.id = id;
+        await apiCall('students', 'PUT', data);
         showToast(`Data ${data.name} berhasil diperbarui!`);
     } else {
-        data.id = nextId(students);
-        students.push(data);
+        data.id = nextId(cachedStudents);
+        await apiCall('students', 'POST', data);
         showToast(`${data.name} berhasil ditambahkan!`);
     }
-    saveData('students_db', students);
+    btn.disabled = false;
     closeModal('student-modal');
+    updateOverview();
     loadStudents();
 });
 
 function deleteStudent(id) {
-    const s = getData('students_db', DEFAULT_STUDENTS).find(x => x.id === id);
-    confirmDelete(`Hapus murid "${s?.name}"? Data tidak bisa dikembalikan.`, () => {
-        const students = getData('students_db', DEFAULT_STUDENTS).filter(x => x.id !== id);
-        saveData('students_db', students);
+    const s = cachedStudents.find(x => x.id === id);
+    confirmDelete(`Hapus murid "${s?.name}"? Data tidak bisa dikembalikan.`, async () => {
+        await apiCall(`students?id=${id}`, 'DELETE');
+        updateOverview();
         loadStudents();
         showToast('Murid berhasil dihapus.');
     });
@@ -378,9 +404,11 @@ function deleteStudent(id) {
 
 // ── STRUKTUR ──────────────────────────────────────────────────
 let currentStrukturColor = '00d4ff';
+let cachedStruktur = [];
 
-function loadStruktur() {
-    const data = getData('struktur_db', DEFAULT_STRUKTUR);
+async function loadStruktur() {
+    cachedStruktur = await getApiData('struktur', DEFAULT_STRUKTUR);
+    const data = cachedStruktur;
     const levelLabels = ['Wali Kelas', 'Ketua / Wakil', 'Staff'];
     const levelColors = ['from-cyber-blue/20 to-cyber-blue/5 border-cyber-blue/20', 'from-electric-purple/20 to-electric-purple/5 border-electric-purple/20', 'from-neon-green/20 to-neon-green/5 border-neon-green/20'];
     const grid = document.getElementById('struktur-grid');
@@ -409,7 +437,7 @@ function openStrukturModal(id = null) {
     currentStrukturColor = '00d4ff';
     setStrukturColor('00d4ff', document.querySelector('.str-color-pick[data-color="00d4ff"]'));
     if (id) {
-        const s = getData('struktur_db', DEFAULT_STRUKTUR).find(x => x.id === id);
+        const s = cachedStruktur.find(x => x.id === id);
         if (!s) return;
         document.getElementById('struktur-id').value = s.id;
         document.getElementById('struktur-name').value = s.name;
@@ -429,9 +457,9 @@ function setStrukturColor(color, el) {
     if (el) el.style.borderColor = '#fff';
 }
 
-document.getElementById('struktur-form').addEventListener('submit', function(e) {
+document.getElementById('struktur-form').addEventListener('submit', async function(e) {
     e.preventDefault();
-    const data_arr = getData('struktur_db', DEFAULT_STRUKTUR);
+    const btn = document.querySelector('#struktur-form button[type="submit"]');
     const id = parseInt(document.getElementById('struktur-id').value);
     const data = {
         name: document.getElementById('struktur-name').value.trim(),
@@ -441,9 +469,11 @@ document.getElementById('struktur-form').addEventListener('submit', function(e) 
         photo: null
     };
     if (!data.name || !data.jabatan) return showToast('Nama dan jabatan wajib diisi!', 'error');
+    
+    btn.disabled = true;
     if (id) {
-        const idx = data_arr.findIndex(s => s.id === id);
-        if (idx > -1) data_arr[idx] = { ...data_arr[idx], ...data };
+        data.id = id;
+        await apiCall('struktur', 'PUT', data);
         showToast('Jabatan berhasil diperbarui!');
     } else {
         data.id = nextId(data_arr);
@@ -466,9 +496,11 @@ function deleteStruktur(id) {
 
 // ── PROJECTS ──────────────────────────────────────────────────
 let currentProjectImageData = null;
+let cachedProjects = [];
 
-function loadProjects() {
-    const data = getData('projects_db', DEFAULT_PROJECTS);
+async function loadProjects() {
+    cachedProjects = await getApiData('projects', DEFAULT_PROJECTS);
+    const data = cachedProjects;
     const grid = document.getElementById('projects-grid');
     grid.innerHTML = data.map(p => `
         <div class="glass rounded-2xl overflow-hidden group flex flex-col" style="border-color: #${p.color}30">
@@ -498,7 +530,7 @@ function openProjectModal(id = null) {
     currentProjectImageData = null;
     document.getElementById('project-img-preview-wrap').innerHTML = '<p class="text-2xl mb-1">🖼️</p><p class="text-xs text-gray-500">Klik untuk upload gambar</p>';
     if (id) {
-        const p = getData('projects_db', DEFAULT_PROJECTS).find(x => x.id === id);
+        const p = cachedProjects.find(x => x.id === id);
         if (!p) return;
         document.getElementById('project-id').value = p.id;
         document.getElementById('project-title').value = p.title;
@@ -525,9 +557,9 @@ function previewProjectImage(input) {
     reader.readAsDataURL(file);
 }
 
-document.getElementById('project-form').addEventListener('submit', function(e) {
+document.getElementById('project-form').addEventListener('submit', async function(e) {
     e.preventDefault();
-    const data_arr = getData('projects_db', DEFAULT_PROJECTS);
+    const btn = document.querySelector('#project-form button[type="submit"]');
     const id = parseInt(document.getElementById('project-id').value);
     const tags = document.getElementById('project-tags').value.split(',').map(t => t.trim()).filter(Boolean);
     const colors = ['00d4ff','7b2ff7','00ff88','ff00aa','ffae00'];
@@ -536,27 +568,29 @@ document.getElementById('project-form').addEventListener('submit', function(e) {
         description: document.getElementById('project-desc').value.trim(),
         tags, link: document.getElementById('project-link').value.trim(),
         image: currentProjectImageData,
-        color: colors[data_arr.length % colors.length]
+        color: colors[cachedProjects.length % colors.length]
     };
     if (!data.title) return showToast('Judul projek wajib diisi!', 'error');
+    
+    btn.disabled = true;
     if (id) {
-        const idx = data_arr.findIndex(p => p.id === id);
-        if (idx > -1) data_arr[idx] = { ...data_arr[idx], ...data };
+        data.id = id;
+        await apiCall('projects', 'PUT', data);
         showToast('Projek berhasil diperbarui!');
     } else {
-        data.id = nextId(data_arr);
-        data_arr.push(data);
+        data.id = nextId(cachedProjects);
+        await apiCall('projects', 'POST', data);
         showToast('Projek berhasil ditambahkan!');
     }
-    saveData('projects_db', data_arr);
+    btn.disabled = false;
     closeModal('project-modal');
     loadProjects();
 });
 
 function deleteProject(id) {
-    const p = getData('projects_db', DEFAULT_PROJECTS).find(x => x.id === id);
-    confirmDelete(`Hapus projek "${p?.title}"?`, () => {
-        saveData('projects_db', getData('projects_db', DEFAULT_PROJECTS).filter(x => x.id !== id));
+    const p = cachedProjects.find(x => x.id === id);
+    confirmDelete(`Hapus projek "${p?.title}"?`, async () => {
+        await apiCall(`projects?id=${id}`, 'DELETE');
         loadProjects();
         showToast('Projek berhasil dihapus.');
     });
@@ -564,9 +598,11 @@ function deleteProject(id) {
 
 // ── GALLERY ───────────────────────────────────────────────────
 let currentGalleryImageData = null;
+let cachedGallery = [];
 
-function loadGallery() {
-    const data = getData('gallery_db', DEFAULT_GALLERY);
+async function loadGallery() {
+    cachedGallery = await getApiData('gallery', DEFAULT_GALLERY);
+    const data = cachedGallery;
     const catColors = { belajar: '00d4ff', keseruan: '00ff88', event: '7b2ff7', candid: 'ffae00' };
     const grid = document.getElementById('gallery-grid-admin');
     grid.innerHTML = data.map(g => `
@@ -591,7 +627,7 @@ function openGalleryModal(id = null) {
     currentGalleryImageData = null;
     document.getElementById('gallery-img-preview-wrap').innerHTML = '<p class="text-3xl mb-1">📷</p><p class="text-xs text-gray-500">Klik atau drag foto ke sini</p>';
     if (id) {
-        const g = getData('gallery_db', DEFAULT_GALLERY).find(x => x.id === id);
+        const g = cachedGallery.find(x => x.id === id);
         if (g) {
             document.getElementById('gallery-id').value = g.id;
             document.getElementById('gallery-title').value = g.title;
@@ -617,9 +653,9 @@ function previewGalleryImage(input) {
     reader.readAsDataURL(file);
 }
 
-document.getElementById('gallery-form').addEventListener('submit', function(e) {
+document.getElementById('gallery-form').addEventListener('submit', async function(e) {
     e.preventDefault();
-    const data_arr = getData('gallery_db', DEFAULT_GALLERY);
+    const btn = document.querySelector('#gallery-form button[type="submit"]');
     const id = parseInt(document.getElementById('gallery-id').value);
     const cat = document.getElementById('gallery-category').value;
     const catColors = { belajar: '00d4ff', keseruan: '00ff88', event: '7b2ff7', candid: 'ffae00' };
@@ -631,31 +667,37 @@ document.getElementById('gallery-form').addEventListener('submit', function(e) {
         span: 'col-span-1'
     };
     if (!data.title) return showToast('Judul foto wajib diisi!', 'error');
+    
+    btn.disabled = true;
     if (id) {
-        const idx = data_arr.findIndex(g => g.id === id);
-        if (idx > -1) data_arr[idx] = { ...data_arr[idx], ...data };
+        data.id = id;
+        await apiCall('gallery', 'PUT', data);
         showToast('Foto berhasil diperbarui!');
     } else {
-        data.id = nextId(data_arr);
-        data_arr.push(data);
+        data.id = nextId(cachedGallery);
+        await apiCall('gallery', 'POST', data);
         showToast('Foto berhasil ditambahkan!');
     }
-    saveData('gallery_db', data_arr);
+    btn.disabled = false;
     closeModal('gallery-modal');
     loadGallery();
 });
 
 function deleteGallery(id) {
-    confirmDelete('Hapus foto ini dari gallery?', () => {
-        saveData('gallery_db', getData('gallery_db', DEFAULT_GALLERY).filter(x => x.id !== id));
+    confirmDelete('Hapus foto ini dari gallery?', async () => {
+        await apiCall(`gallery?id=${id}`, 'DELETE');
         loadGallery();
         showToast('Foto berhasil dihapus.');
     });
 }
 
 // ── GUESTBOOK ─────────────────────────────────────────────────
-function loadGuestbook() {
-    const messages = JSON.parse(localStorage.getItem('xrpl_guestbook') || '[]');
+let cachedGuestbook = [];
+
+async function loadGuestbook() {
+    const res = await apiCall('guestbook');
+    cachedGuestbook = (res && res.data) ? res.data : JSON.parse(localStorage.getItem('xrpl_guestbook') || '[]');
+    const messages = cachedGuestbook;
     const el = document.getElementById('guestbook-admin');
     if (messages.length === 0) {
         el.innerHTML = '<p class="text-gray-500 text-sm italic text-center py-12">Belum ada pesan di guestbook.</p>';
@@ -676,19 +718,21 @@ function loadGuestbook() {
     `).join('');
 }
 
-function deleteGuestbookMsg(idx) {
-    const msgs = JSON.parse(localStorage.getItem('xrpl_guestbook') || '[]');
-    msgs.splice(idx, 1);
-    localStorage.setItem('xrpl_guestbook', JSON.stringify(msgs));
-    loadGuestbook();
+async function deleteGuestbookMsg(idx) {
+    const messagesStr = [...cachedGuestbook].reverse(); // visual array is reversed
+    const msg = messagesStr[idx];
+    if(msg && msg.date && msg.name) {
+        await apiCall(`guestbook?date=${encodeURIComponent(msg.date)}&name=${encodeURIComponent(msg.name)}`, 'DELETE');
+    }
+    await loadGuestbook();
     updateOverview();
     showToast('Pesan berhasil dihapus.');
 }
 
 function clearAllGuestbook() {
-    confirmDelete('Hapus SEMUA pesan guestbook? Tindakan ini tidak bisa dibatalkan!', () => {
-        localStorage.removeItem('xrpl_guestbook');
-        loadGuestbook();
+    confirmDelete('Hapus SEMUA pesan guestbook? Tindakan ini tidak bisa dibatalkan!', async () => {
+        await apiCall('guestbook?all=true', 'DELETE');
+        await loadGuestbook();
         updateOverview();
         showToast('Semua pesan berhasil dihapus.');
     });

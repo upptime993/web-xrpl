@@ -9,38 +9,56 @@ document.addEventListener('DOMContentLoaded', () => {
     // Ambil data: coba dari localStorage (dashboard) dulu, fallback ke data.json
     async function loadData() {
         try {
-            // Cek apakah ada data dari dashboard di localStorage
-            const lsStudents = localStorage.getItem('xrpl_students_db');
-            const lsGallery  = localStorage.getItem('xrpl_gallery_db');
-            const lsProjects = localStorage.getItem('xrpl_projects_db');
+            // Fetch dari API secara paralel
+            const [resStudents, resGallery, resProjects] = await Promise.all([
+                fetch('api/students').catch(() => null),
+                fetch('api/gallery').catch(() => null),
+                fetch('api/projects').catch(() => null)
+            ]);
 
-            if (lsStudents && lsGallery) {
-                // Gunakan data dari dashboard (localStorage)
-                studentsData = JSON.parse(lsStudents);
-                galleryData  = JSON.parse(lsGallery);
-                projectsData = lsProjects ? JSON.parse(lsProjects) : [];
-                renderStudents();
-                renderGallery();
-                renderProjects();
-                hilangkanLoadingScreen();
-            } else {
-                // Fallback: fetch dari data.json
-                const response = await fetch('data.json');
-                if (!response.ok) throw new Error('Gagal memuat data');
-                const data = await response.json();
-                studentsData = data.students;
-                galleryData  = data.gallery;
-                projectsData = [];
-                renderStudents();
-                renderGallery();
-                hilangkanLoadingScreen();
+            let fallbackToLocal = false;
+
+            if (resStudents && resStudents.ok) {
+                const sData = await resStudents.json();
+                studentsData = sData.data || [];
+            } else fallbackToLocal = true;
+
+            if (resGallery && resGallery.ok) {
+                const gData = await resGallery.json();
+                galleryData = gData.data || [];
+            } else fallbackToLocal = true;
+
+            if (resProjects && resProjects.ok) {
+                const pData = await resProjects.json();
+                projectsData = pData.data || [];
+            } else fallbackToLocal = true;
+
+            if (fallbackToLocal && studentsData.length === 0) {
+                // Gunakan default.json jika API benar-benar mati
+                const res = await fetch('data.json').catch(e=>({ok:false}));
+                if (res.ok) {
+                    const localData = await res.json();
+                    studentsData = localData.students || [];
+                    galleryData = localData.gallery || [];
+                    projectsData = localData.projects || []; // kalau ada
+                } else {
+                    // Coba local storage
+                    studentsData = JSON.parse(localStorage.getItem('xrpl_students_db') || '[]');
+                    galleryData = JSON.parse(localStorage.getItem('xrpl_gallery_db') || '[]');
+                    projectsData = JSON.parse(localStorage.getItem('xrpl_projects_db') || '[]');
+                }
             }
+
+            renderStudents();
+            renderGallery();
+            renderProjects();
+            hilangkanLoadingScreen();
         } catch (error) {
             console.error("Error memuat data:", error);
             document.getElementById('loading-screen').innerHTML = `
                 <div class="text-center">
                     <h1 class="text-white text-2xl mb-4">Oops! Gagal memuat data.</h1>
-                    <p class="text-text-secondary">Pastikan kamu membukanya lewat Local Server (Live Server), bukan klik 2x file HTML-nya.</p>
+                    <p class="text-text-secondary">Pastikan koneksi server API menyala.</p>
                 </div>`;
         }
     }
@@ -163,12 +181,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     // 3. FITUR BUKU TAMU (LOCALSTORAGE)
     // ==========================================
-    function initGuestbook() {
+    async function initGuestbook() {
         const form = document.getElementById('guestbook-form');
         const list = document.getElementById('guestbook-list');
         const emptyMsg = document.getElementById('gb-empty');
 
-        let messages = JSON.parse(localStorage.getItem('xrpl_guestbook')) || [];
+        const escHtml = (str) => String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        let messages = [];
 
         const renderMessages = () => {
             if (messages.length === 0) {
@@ -178,20 +197,35 @@ document.addEventListener('DOMContentLoaded', () => {
             emptyMsg.style.display = 'none';
             Array.from(list.children).forEach(child => { if (child.id !== 'gb-empty') child.remove(); });
             
-            messages.slice().reverse().forEach(msg => {
+            messages.forEach(msg => {
                 const div = document.createElement('div');
                 div.className = 'bg-white/5 p-4 rounded-xl border border-white/10 mb-3 animate-fade-in-up';
                 div.innerHTML = `
-                    <h4 class="font-bold text-cyber-blue text-sm">${msg.name}</h4>
-                    <p class="text-text-secondary text-sm mt-1 break-words">${msg.text}</p>
-                    <span class="text-[10px] text-white/30 mt-2 block">${msg.date}</span>
+                    <h4 class="font-bold text-cyber-blue text-sm">${escHtml(msg.name)}</h4>
+                    <p class="text-text-secondary text-sm mt-1 break-words">${escHtml(msg.text)}</p>
+                    <span class="text-[10px] text-white/30 mt-2 block">${escHtml(msg.date)}</span>
                 `;
                 list.appendChild(div);
             });
         };
 
-        form.addEventListener('submit', (e) => {
+        // Fetch API
+        try {
+            const res = await fetch('api/guestbook');
+            if (res.ok) {
+                const json = await res.json();
+                messages = json.data || [];
+            } else {
+                messages = JSON.parse(localStorage.getItem('xrpl_guestbook') || '[]');
+            }
+        } catch {
+            messages = JSON.parse(localStorage.getItem('xrpl_guestbook') || '[]');
+        }
+        renderMessages();
+
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
+            const btn = form.querySelector('button');
             const nameInput = document.getElementById('gb-name');
             const msgInput = document.getElementById('gb-message');
             
@@ -201,15 +235,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 date: new Date().toLocaleDateString('id-ID', { hour: '2-digit', minute:'2-digit' })
             };
 
-            messages.push(newMsg);
-            localStorage.setItem('xrpl_guestbook', JSON.stringify(messages));
-            
-            nameInput.value = '';
-            msgInput.value = '';
-            renderMessages();
+            btn.disabled = true;
+            try {
+                const res = await fetch('api/guestbook', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newMsg)
+                });
+                if(res.ok) {
+                    messages.unshift(newMsg);
+                    nameInput.value = '';
+                    msgInput.value = '';
+                    renderMessages();
+                }
+            } catch(err) {
+                messages.unshift(newMsg);
+                localStorage.setItem('xrpl_guestbook', JSON.stringify(messages));
+                nameInput.value = '';
+                msgInput.value = '';
+                renderMessages();
+            }
+            btn.disabled = false;
         });
-
-        renderMessages();
     }
 
     // ==========================================
