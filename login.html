@@ -238,38 +238,33 @@
         arrow.textContent = el.classList.contains('hidden') ? '▼' : '▲';
     }
 
-        // ... kode sebelumnya ...
-
-    fetch('api/auth', { // <-- PERUBAHAN 1: Hapus .php
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            // Login Berhasil
-            localStorage.setItem('xrpl_admin_logged_in', 'true');
-            localStorage.setItem('xrpl_admin_user', JSON.stringify(data.user));
-            
-            btnText.textContent = '✅ Berhasil! Mengalihkan...';
-            btnText.classList.remove('hidden'); btnLoader.classList.add('hidden');
-            setTimeout(() => { window.location.href = 'dashboard.html'; }, 800);
-        } else {
-            // PERUBAHAN 2: Tampilkan pesan ASLI dari server
-            showError(data.message || 'Login ditolak oleh server.');
+        fetch('api/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                localStorage.setItem('xrpl_admin_logged_in', 'true');
+                localStorage.setItem('xrpl_admin_user', JSON.stringify(data.user));
+                
+                btnText.textContent = '✅ Berhasil! Mengalihkan...';
+                btnText.classList.remove('hidden'); btnLoader.classList.add('hidden');
+                setTimeout(() => { window.location.href = 'dashboard.html'; }, 800);
+            } else {
+                showError(data.message || 'Username atau password salah.');
+                btn.disabled = false;
+                btnText.classList.remove('hidden'); btnLoader.classList.add('hidden');
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            showError('Terjadi kesalahan koneksi.');
             btn.disabled = false;
             btnText.classList.remove('hidden'); btnLoader.classList.add('hidden');
-        }
-    })
-    .catch(err => {
-        console.error(err);
-        showError('Terjadi kesalahan koneksi.');
-        btn.disabled = false;
-        btnText.classList.remove('hidden'); btnLoader.classList.add('hidden');
+        });
     });
-
-    // ... kode selanjutnya ...
 
     // Keyboard shortcut: Enter
     document.getElementById('password').addEventListener('keydown', function(e) {
