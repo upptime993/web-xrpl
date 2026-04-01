@@ -767,9 +767,9 @@ let myCurrentPhotoData = null;
 function loadMyProfile() {
     if (window.CURRENT_ROLE !== 'student') return;
     
-    // Fallback: Ambil dari localStorage karena GET /api/students.php belum difilter proper 1 per 1 untuk student
-    // Atau ambil dari list via GET /api/students.php
-    fetch('api/students.php')
+    // Fallback: Ambil dari localStorage karena GET /api/students belum difilter proper 1 per 1 untuk student
+    // Atau ambil dari list via GET /api/students
+    fetch('api/students')
         .then(res => res.json())
         .then(data => {
             if(data.success) {
@@ -806,7 +806,7 @@ function uploadMyPhoto(input) {
     formData.append('id', window.CURRENT_USER_ID);
     formData.append('photo', file);
 
-    fetch('api/upload.php', {
+    fetch('api/upload', {
         method: 'POST',
         body: formData
     })
@@ -833,7 +833,7 @@ function saveMyProfile(e) {
         quote: document.getElementById('my-quote').value
     };
 
-    fetch(`api/students.php?id=${window.CURRENT_USER_ID}`, {
+    fetch(`api/students?id=${window.CURRENT_USER_ID}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -859,7 +859,7 @@ function saveMyProfile(e) {
 
 // ── MY SNAPSHOTS (STUDENT) ────────────────────────────────────
 function loadMySnapshots() {
-    fetch(`api/snapshots.php?student_id=${window.CURRENT_USER_ID}`)
+    fetch(`api/snapshots?student_id=${window.CURRENT_USER_ID}`)
     .then(res => res.json())
     .then(res => {
         if(res.success) {
@@ -926,7 +926,7 @@ function saveMySnapshot(e) {
     formData.append('image', document.getElementById('snapshot-input').files[0]);
     formData.append('caption', document.getElementById('snapshot-caption').value);
     
-    fetch('api/snapshots.php', {
+    fetch('api/snapshots', {
         method: 'POST',
         body: formData
     })
@@ -951,7 +951,7 @@ function saveMySnapshot(e) {
 
 function deleteMySnapshot(id) {
     confirmDelete('Yakin hapus snapshot ini?', () => {
-        fetch(`api/snapshots.php?id=${id}`, { method: 'DELETE' })
+        fetch(`api/snapshots?id=${id}`, { method: 'DELETE' })
         .then(res => res.json())
         .then(res => {
             if(res.success) {

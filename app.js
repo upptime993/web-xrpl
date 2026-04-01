@@ -440,7 +440,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.getElementById('modal-gallery').innerHTML = '<div class="col-span-3 text-center py-4"><span class="text-white text-sm animate-pulse">Memuat gallery...</span></div>';
 
-        fetch(`api/snapshots.php?student_id=${s.id}`)
+        fetch(`api/snapshots?student_id=${s.id}`)
             .then(res => res.json())
             .then(data => {
                 let miniGalleryHTML = '';
@@ -712,7 +712,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('snap-lb-like-btn').addEventListener('click', () => {
         if (!currentSnapId) return;
         
-        fetch('api/snapshots.php?action=like', {
+        fetch('api/snapshots?action=like', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ snapshot_id: currentSnapId })
@@ -763,7 +763,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const btn = e.target.querySelector('button[type="submit"]');
         btn.disabled = true;
 
-        fetch('api/snapshots.php?action=comment', {
+        fetch('api/snapshots?action=comment', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ snapshot_id: currentSnapId, name, text })
