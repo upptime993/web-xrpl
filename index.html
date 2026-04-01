@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="id" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Website profil kelas X RPL - Rekayasa Perangkat Lunak">
+    <meta name="keywords" content="RPL, Rekayasa Perangkat Lunak, kelas X, profil kelas, coding, sekolah">
+    <meta property="og:title" content="X RPL - Rekayasa Perangkat Lunak">
+    <meta property="og:description" content="Profil kelas X RPL Angkatan 2024/2025">
+    <title>X RPL | Rekayasa Perangkat Lunak</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'cyber-blue': '#00d4ff',
+                        'electric-purple': '#7b2ff7',
+                        'neon-green': '#00ff88',
+                        'dark-bg': '#0a0a0f',
+                        'dark-section': '#0d0d15',
+                        'dark-alt': '#111122',
+                        'text-secondary': '#a0a0b0',
+                    },
+                    fontFamily: {
+                        heading: ['Orbitron', 'sans-serif'],
+                        body: ['Poppins', 'sans-serif'],
+                        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', "Liberation Mono", "Courier New", 'monospace'],
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'float-delayed': 'float 6s ease-in-out 3s infinite',
+                        'glow-pulse': 'glowPulse 2s ease-in-out infinite',
+                        'typing': 'typing 3.5s steps(40) 1s forwards, blink 0.75s step-end infinite',
+                        'fade-in-up': 'fadeInUp 0.6s ease-out forwards',
+                        'fade-in-left': 'fadeInLeft 0.6s ease-out forwards',
+                        'fade-in-right': 'fadeInRight 0.6s ease-out forwards',
+                        'scale-in': 'scaleIn 0.5s ease-out forwards',
+                        'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'marquee': 'marquee 25s linear infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-20px)' },
+                        },
+                        glowPulse: {
+                            '0%, 100%': { filter: 'drop-shadow(0 0 15px rgba(0,212,255,0.4))' },
+                            '50%': { filter: 'drop-shadow(0 0 25px rgba(123,47,247,0.6))' },
+                        },
+                        typing: {
+                            from: { width: '0' },
+                            to: { width: '32ch' },
+                        },
+                        blink: {
+                            'from, to': { borderColor: 'transparent' },
+                            '50%': { borderColor: '#00d4ff' },
+                        },
+                        fadeInUp: {
+                            from: { opacity: '0', transform: 'translateY(30px)' },
+                            to: { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        scaleIn: {
+                            from: { opacity: '0', transform: 'scale(0.9)' },
+                            to: { opacity: '1', transform: 'scale(1)' },
+                        },
+                        marquee: {
+                            '0%': { transform: 'translateX(0%)' },
+                            '100%': { transform: 'translateX(-100%)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #0a0a0f;
+            color: #ffffff;
+            font-family: 'Poppins', sans-serif;
+            overflow-x: hidden;
+        }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0a0a0f; }
+        ::-webkit-scrollbar-thumb { background: linear-gradient(to bottom, #00d4ff, #7b2ff7); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: linear-gradient(to bottom, #7b2ff7, #00d4ff); }
+        #particles-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+        .typing-text { display: inline-block; overflow: hidden; white-space: nowrap; border-right: 3px solid transparent; width: 0; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .reveal { opacity: 0; transform: translateY(30px); transition: all 0.8s cubic-bezier(0.5, 0, 0, 1); will-change: opacity, transform; }
+        .reveal.active { opacity: 1; transform: translateY(0); }
+        .focus-outline-none:focus { outline: none; }
+        .org-connector-v { width: 2px; height: 24px; background: linear-gradient(to bottom, #00d4ff, #7b2ff7); margin: 0 auto; }
+        .org-connector-h { border-top: 2px solid #7b2ff7; width: 100%; position: absolute; top: 0; left: 0; }
+        .footer-gradient-border { position: relative; }
+        .footer-gradient-border::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, #00d4ff, #7b2ff7, transparent); }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="antialiased selection:bg-cyber-blue selection:text-dark-bg">
+
+    <div id="loading-screen" class="fixed inset-0 z-[100] bg-dark-bg flex flex-col items-center justify-center transition-opacity duration-500">
+        <h1 class="text-4xl md:text-6xl font-heading font-bold bg-gradient-to-r from-cyber-blue to-electric-purple bg-clip-text text-transparent animate-pulse-fast tracking-widest">
+            X RPL
+        </h1>
+        <div class="w-48 md:w-64 h-1 bg-white/10 rounded-full mt-8 overflow-hidden relative">
+            <div id="loading-bar" class="absolute top-0 left-0 h-full bg-gradient-to-r from-cyber-blue to-electric-purple w-0 transition-all duration-[1500ms] ease-out"></div>
+        </div>
+    </div>
+
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 z-[60] bg-cyber-blue text-dark-bg px-4 py-2 font-bold rounded-md">Skip to content</a>
+
+    <nav id="navbar" class="fixed w-full top-0 z-50 transition-all duration-300 bg-white/5 backdrop-blur-md border-b border-white/5">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-20">
+                <div class="flex-shrink-0">
+                    <a href="#" class="font-heading text-2xl font-bold tracking-wider bg-gradient-to-r from-cyber-blue to-electric-purple bg-clip-text text-transparent group hover:scale-105 transition-transform duration-300 inline-block">
+                        <span class="text-white group-hover:text-cyber-blue transition-colors">&lt;</span>X_RPL<span class="text-white group-hover:text-electric-purple transition-colors">/&gt;</span>
+                    </a>
+                </div>
+                <div class="hidden md:flex items-center gap-2">
+                    <div class="ml-6 flex items-baseline space-x-4">
+                        <a href="#home" class="nav-link active px-3 py-2 rounded-md text-sm font-medium transition-all hover:text-cyber-blue relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-gradient-to-r after:from-cyber-blue after:to-electric-purple hover:after:w-full after:transition-all after:duration-300">Home</a>
+                        <a href="#about" class="nav-link text-text-secondary hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-all relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-gradient-to-r after:from-cyber-blue after:to-electric-purple hover:after:w-full after:transition-all after:duration-300">About</a>
+                        <a href="#struktur" class="nav-link text-text-secondary hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-all relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-gradient-to-r after:from-cyber-blue after:to-electric-purple hover:after:w-full after:transition-all after:duration-300">Struktur</a>
+                        <a href="#murid" class="nav-link text-text-secondary hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-all relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-gradient-to-r after:from-cyber-blue after:to-electric-purple hover:after:w-full after:transition-all after:duration-300">Murid</a>
+                        <a href="#projek" class="nav-link text-text-secondary hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-all relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-gradient-to-r after:from-cyber-blue after:to-electric-purple hover:after:w-full after:transition-all after:duration-300">Projek</a>
+                        <a href="#guestbook" class="nav-link text-text-secondary hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-all relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-gradient-to-r after:from-cyber-blue after:to-electric-purple hover:after:w-full after:transition-all after:duration-300">Guestbook</a>
+                    </div>
+                    <!-- Login/Dashboard Button -->
+                    <div id="nav-auth-btn" class="ml-4"></div>
+                </div>
+                <div class="md:hidden flex items-center">
+                    <button id="mobile-menu-btn" aria-label="Toggle menu" class="text-text-secondary hover:text-white focus:outline-none focus:text-white p-2">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path id="menu-icon-path" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="mobile-menu" class="fixed inset-0 bg-dark-bg/95 backdrop-blur-lg z-40 transform translate-x-full transition-transform duration-300 md:hidden flex flex-col items-center justify-center space-y-8 h-screen pt-20">
+            <a href="#home" class="mobile-nav-link text-2xl font-heading text-white hover:text-cyber-blue transition-colors">Home</a>
+            <a href="#about" class="mobile-nav-link text-2xl font-heading text-text-secondary hover:text-white transition-colors">About</a>
+            <a href="#struktur" class="mobile-nav-link text-2xl font-heading text-text-secondary hover:text-white transition-colors">Struktur Kelas</a>
+            <a href="#murid" class="mobile-nav-link text-2xl font-heading text-text-secondary hover:text-white transition-colors">Murid</a>
+            <a href="#projek" class="mobile-nav-link text-2xl font-heading text-text-secondary hover:text-white transition-colors">Projek</a>
+            <a href="#guestbook" class="mobile-nav-link text-2xl font-heading text-text-secondary hover:text-white transition-colors">Guestbook</a>
+            <div id="mobile-auth-btn"></div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <section id="home" class="relative h-screen flex items-center justify-center overflow-hidden bg-gradient-to-b from-dark-bg to-dark-section">
+            <canvas id="particles-bg"></canvas>
+            
+            <div class="absolute inset-0 overflow-hidden pointer-events-none z-10">
+                <span class="absolute top-[20%] left-[15%] text-4xl opacity-20 animate-float">💻</span>
+                <span class="absolute top-[60%] left-[10%] text-3xl opacity-20 animate-float-delayed">📱</span>
+                <span class="absolute top-[30%] right-[15%] text-5xl opacity-20 animate-float">🗄️</span>
+                <span class="absolute top-[70%] right-[20%] text-4xl opacity-20 animate-float-delayed">⚡</span>
+                <span class="absolute bottom-[20%] left-[30%] text-3xl opacity-20 animate-float">🎨</span>
+                <span class="absolute top-[15%] right-[40%] text-3xl opacity-20 animate-float-delayed">🌐</span>
+            </div>
+
+            <div class="relative z-20 text-center px-4 max-w-5xl mx-auto flex flex-col items-center">
+                <h1 class="font-heading text-6xl md:text-8xl lg:text-9xl font-black mb-4 tracking-tighter animate-glow-pulse">
+                    <span class="bg-gradient-to-r from-cyber-blue to-electric-purple bg-clip-text text-transparent">X RPL</span>
+                </h1>
+                <h2 class="text-xl md:text-2xl text-text-secondary font-light mb-8 opacity-0 animate-fade-in-up" style="animation-delay: 0.5s;">
+                    Rekayasa Perangkat Lunak <span class="hidden sm:inline">|</span><br class="sm:hidden"> Angkatan 2024/2025
+                </h2>
+                
+                <div class="h-8 md:h-10 mb-10 text-lg md:text-2xl font-mono text-white">
+                    <span id="hero-typing" class="text-neon-green"></span>
+                </div>
+
+                <a href="#about" class="group relative inline-flex items-center justify-center px-8 py-3.5 text-base font-bold text-white transition-all duration-300 bg-gradient-to-r from-cyber-blue to-electric-purple rounded-full hover:scale-105 hover:shadow-[0_0_20px_rgba(0,212,255,0.5)] focus:outline-none opacity-0 animate-fade-in-up" style="animation-delay: 1.5s;">
+                    Jelajahi Kelas Kami
+                    <svg class="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                </a>
+            </div>
+        </section>
+
+        <div class="w-full bg-cyber-blue/10 border-y border-cyber-blue/20 py-4 overflow-hidden flex relative z-30">
+            <div class="animate-marquee whitespace-nowrap flex items-center space-x-12 px-8 font-mono text-cyber-blue/80 text-xl font-bold tracking-widest">
+                <span>HTML5</span><span>•</span>
+                <span>CSS3</span><span>•</span>
+                <span>JAVASCRIPT</span><span>•</span>
+                <span>PHP</span><span>•</span>
+                <span>MYSQL</span><span>•</span>
+                <span>C++</span><span>•</span>
+                <span>PYTHON</span><span>•</span>
+                <span>ANDROID STUDIO</span><span>•</span>
+                <span>HTML5</span><span>•</span>
+                <span>CSS3</span><span>•</span>
+                <span>JAVASCRIPT</span><span>•</span>
+                <span>PHP</span><span>•</span>
+                <span>MYSQL</span><span>•</span>
+                <span>C++</span><span>•</span>
+                <span>PYTHON</span><span>•</span>
+                <span>ANDROID STUDIO</span>
+            </div>
+        </div>
+
+        <section id="about" class="py-24 px-4 bg-dark-section">
+            <div class="max-w-7xl mx-auto">
+                <div class="text-center mb-16 reveal">
+                    <h2 class="text-4xl md:text-5xl font-heading font-bold text-white mb-4">Tentang RPL</h2>
+                    <div class="w-24 h-1 bg-gradient-to-r from-cyber-blue to-electric-purple mx-auto rounded-full mb-12"></div>
+                    
+                    <div class="relative border-l-2 border-electric-purple ml-4 md:ml-auto max-w-3xl mx-auto mb-16 space-y-8 text-left">
+                        <div class="relative pl-6">
+                            <div class="absolute w-4 h-4 bg-cyber-blue rounded-full -left-[9px] top-1 shadow-[0_0_10px_#00d4ff]"></div>
+                            <h3 class="text-xl font-bold text-white">Semester 1: Fundamental</h3>
+                            <p class="text-text-secondary text-sm">Algoritma dasar, flowchart, HTML, CSS, dan dasar Logika Pemrograman.</p>
+                        </div>
+                        <div class="relative pl-6">
+                            <div class="absolute w-4 h-4 bg-electric-purple rounded-full -left-[9px] top-1 shadow-[0_0_10px_#7b2ff7]"></div>
+                            <h3 class="text-xl font-bold text-white">Semester 2: Dinamis & Basis Data</h3>
+                            <p class="text-text-secondary text-sm">JavaScript DOM, PHP Native, perancangan ERD, dan MySQL.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-20">
+                    <div class="glass rounded-2xl p-6 hover:-translate-y-2 hover:border-cyber-blue/50 hover:shadow-[0_10px_30px_rgba(0,212,255,0.15)] transition-all duration-300 reveal">
+                        <div class="text-5xl mb-4">💻</div>
+                        <h3 class="text-xl font-heading font-semibold text-cyber-blue mb-2">Web Development</h3>
+                        <p class="text-sm text-text-secondary">Mempelajari HTML, CSS, JavaScript, dan framework modern.</p>
+                    </div>
+                    <div class="glass rounded-2xl p-6 hover:-translate-y-2 hover:border-electric-purple/50 hover:shadow-[0_10px_30px_rgba(123,47,247,0.15)] transition-all duration-300 reveal delay-100">
+                        <div class="text-5xl mb-4">📱</div>
+                        <h3 class="text-xl font-heading font-semibold text-electric-purple mb-2">Mobile Dev</h3>
+                        <p class="text-sm text-text-secondary">Membangun aplikasi Android dan iOS native maupun hybrid yang responsif.</p>
+                    </div>
+                    <div class="glass rounded-2xl p-6 hover:-translate-y-2 hover:border-neon-green/50 hover:shadow-[0_10px_30px_rgba(0,255,136,0.15)] transition-all duration-300 reveal delay-200">
+                        <div class="text-5xl mb-4">🗄️</div>
+                        <h3 class="text-xl font-heading font-semibold text-neon-green mb-2">Database</h3>
+                        <p class="text-sm text-text-secondary">Mengelola, merancang, dan mengoptimalkan sistem database SQL.</p>
+                    </div>
+                    <div class="glass rounded-2xl p-6 hover:-translate-y-2 hover:border-cyber-blue/50 hover:shadow-[0_10px_30px_rgba(0,212,255,0.15)] transition-all duration-300 reveal delay-300">
+                        <div class="text-5xl mb-4">🎨</div>
+                        <h3 class="text-xl font-heading font-semibold text-cyber-blue mb-2">UI/UX Design</h3>
+                        <p class="text-sm text-text-secondary">Merancang prototipe antarmuka yang user-friendly dan menarik.</p>
+                    </div>
+                </div>
+
+                <div id="stats-container" class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center glass rounded-3xl p-8 reveal border-t-0 border-b-0 border-l border-r border-gradient-to-b from-transparent via-white/10 to-transparent">
+                    <div>
+                        <div class="text-4xl md:text-5xl font-heading font-bold text-transparent bg-clip-text bg-gradient-to-br from-cyber-blue to-white mb-2 counter" data-target="36">0</div>
+                        <div class="text-sm text-text-secondary uppercase tracking-wider font-semibold">Murid</div>
+                    </div>
+                    <div>
+                        <div class="text-4xl md:text-5xl font-heading font-bold text-transparent bg-clip-text bg-gradient-to-br from-electric-purple to-white mb-2 counter" data-target="15">0</div>
+                        <div class="text-sm text-text-secondary uppercase tracking-wider font-semibold">Projek</div>
+                    </div>
+                    <div>
+                        <div class="text-4xl md:text-5xl font-heading font-bold text-transparent bg-clip-text bg-gradient-to-br from-neon-green to-white mb-2 counter" data-target="1">0</div>
+                        <div class="text-sm text-text-secondary uppercase tracking-wider font-semibold">Keluarga</div>
+                    </div>
+                    <div>
+                        <div class="text-4xl md:text-5xl font-heading font-bold text-white mb-2">∞</div>
+                        <div class="text-sm text-text-secondary uppercase tracking-wider font-semibold">Kenangan</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="struktur" class="py-24 px-4 bg-dark-alt">
+            <div class="max-w-6xl mx-auto">
+                <div class="text-center mb-16 reveal">
+                    <h2 class="text-4xl font-heading font-bold text-white mb-4">Struktur Organisasi</h2>
+                    <div class="w-24 h-1 bg-gradient-to-r from-electric-purple to-cyber-blue mx-auto rounded-full"></div>
+                </div>
+
+                <div class="flex flex-col items-center mt-12 w-full px-2">
+                    
+                    <div class="flex flex-col items-center reveal w-full">
+                        <div class="glass w-56 md:w-64 rounded-2xl p-5 text-center border-t border-t-cyber-blue relative z-10 hover:scale-105 transition-transform duration-300 hover:shadow-[0_0_20px_rgba(0,212,255,0.2)]">
+                            <img src="https://ui-avatars.com/api/?name=Bapak+Guru&background=00d4ff&color=fff&size=150" alt="Wali Kelas" class="w-16 h-16 md:w-20 md:h-20 rounded-full mx-auto mb-3 object-cover border-2 border-cyber-blue" loading="lazy">
+                            <h3 class="font-bold text-white text-base md:text-lg">Bpk. Budi Santoso</h3>
+                            <p class="text-xs md:text-sm font-medium text-cyber-blue">Wali Kelas</p>
+                        </div>
+                        <div class="w-[2px] h-8 md:h-12 bg-gradient-to-b from-cyber-blue to-electric-purple"></div>
+                    </div>
+
+                    <div class="relative w-full max-w-2xl reveal delay-100">
+                        <div class="absolute top-0 left-[20%] right-[20%] md:left-1/4 md:right-1/4 h-[2px] bg-electric-purple z-0"></div>
+                        
+                        <div class="flex justify-center gap-4 md:gap-32 relative z-10 w-full">
+                            <div class="relative flex flex-col items-center w-1/2 max-w-[180px] md:w-48">
+                                <div class="absolute -top-8 md:-top-12 w-[2px] h-8 md:h-12 bg-electric-purple"></div>
+                                <div class="glass w-full rounded-2xl p-3 md:p-4 text-center hover:scale-105 transition-transform duration-300 hover:shadow-[0_0_15px_rgba(123,47,247,0.2)]">
+                                    <img src="https://ui-avatars.com/api/?name=Ahmad+Rizky&background=7b2ff7&color=fff&size=150" alt="Ketua Kelas" class="w-12 h-12 md:w-16 md:h-16 rounded-full mx-auto mb-2 object-cover" loading="lazy">
+                                    <h3 class="font-semibold text-white text-xs md:text-sm">Ahmad Rizky</h3>
+                                    <p class="text-[10px] md:text-xs text-electric-purple">Ketua Kelas</p>
+                                </div>
+                                <div class="w-[2px] h-6 md:h-8 bg-gradient-to-b from-electric-purple to-white/20"></div>
+                            </div>
+                            
+                            <div class="relative flex flex-col items-center w-1/2 max-w-[180px] md:w-48">
+                                <div class="absolute -top-8 md:-top-12 w-[2px] h-8 md:h-12 bg-electric-purple"></div>
+                                <div class="glass w-full rounded-2xl p-3 md:p-4 text-center hover:scale-105 transition-transform duration-300 hover:shadow-[0_0_15px_rgba(123,47,247,0.2)]">
+                                    <img src="https://ui-avatars.com/api/?name=Dina+Puspita&background=7b2ff7&color=fff&size=150" alt="Wakil Ketua" class="w-12 h-12 md:w-16 md:h-16 rounded-full mx-auto mb-2 object-cover" loading="lazy">
+                                    <h3 class="font-semibold text-white text-xs md:text-sm">Dina Puspita</h3>
+                                    <p class="text-[10px] md:text-xs text-electric-purple">Wakil Ketua</p>
+                                </div>
+                                <div class="w-[2px] h-6 md:h-8 bg-gradient-to-b from-electric-purple to-white/20"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="relative w-full max-w-3xl reveal delay-200">
+                        <div class="absolute top-0 left-[10%] right-[10%] h-[2px] bg-white/20 z-0"></div>
+                        
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 relative z-10 w-full px-2 mt-0">
+                            <div class="relative flex flex-col items-center">
+                                <div class="absolute -top-6 md:-top-8 w-[2px] h-6 md:h-8 bg-white/20"></div>
+                                <div class="glass w-full max-w-[150px] rounded-2xl p-3 text-center hover:scale-105 transition-transform">
+                                    <img src="https://ui-avatars.com/api/?name=Siti+Aisyah&background=00ff88&color=000&size=150" alt="Sekretaris 1" class="w-10 h-10 md:w-14 md:h-14 rounded-full mx-auto mb-2" loading="lazy">
+                                    <h3 class="font-medium text-white text-[11px] md:text-xs truncate w-full">Siti Aisyah</h3>
+                                    <p class="text-[9px] md:text-[10px] text-neon-green">Sekretaris 1</p>
+                                </div>
+                            </div>
+                            <div class="relative flex flex-col items-center">
+                                <div class="absolute -top-6 md:-top-8 w-[2px] h-6 md:h-8 bg-white/20"></div>
+                                <div class="glass w-full max-w-[150px] rounded-2xl p-3 text-center hover:scale-105 transition-transform">
+                                    <img src="https://ui-avatars.com/api/?name=Bagas+Putra&background=00ff88&color=000&size=150" alt="Sekretaris 2" class="w-10 h-10 md:w-14 md:h-14 rounded-full mx-auto mb-2" loading="lazy">
+                                    <h3 class="font-medium text-white text-[11px] md:text-xs truncate w-full">Bagas Putra</h3>
+                                    <p class="text-[9px] md:text-[10px] text-neon-green">Sekretaris 2</p>
+                                </div>
+                            </div>
+                            <div class="relative flex flex-col items-center">
+                                <div class="absolute -top-6 md:-top-8 w-[2px] h-6 md:h-8 bg-white/20"></div>
+                                <div class="glass w-full max-w-[150px] rounded-2xl p-3 text-center hover:scale-105 transition-transform">
+                                    <img src="https://ui-avatars.com/api/?name=Maya+Sari&background=ff00aa&color=fff&size=150" alt="Bendahara 1" class="w-10 h-10 md:w-14 md:h-14 rounded-full mx-auto mb-2" loading="lazy">
+                                    <h3 class="font-medium text-white text-[11px] md:text-xs truncate w-full">Maya Sari</h3>
+                                    <p class="text-[9px] md:text-[10px] text-[#ff00aa]">Bendahara 1</p>
+                                </div>
+                            </div>
+                            <div class="relative flex flex-col items-center">
+                                <div class="absolute -top-6 md:-top-8 w-[2px] h-6 md:h-8 bg-white/20"></div>
+                                <div class="glass w-full max-w-[150px] rounded-2xl p-3 text-center hover:scale-105 transition-transform">
+                                    <img src="https://ui-avatars.com/api/?name=Kevin+Julian&background=ff00aa&color=fff&size=150" alt="Bendahara 2" class="w-10 h-10 md:w-14 md:h-14 rounded-full mx-auto mb-2" loading="lazy">
+                                    <h3 class="font-medium text-white text-[11px] md:text-xs truncate w-full">Kevin Julian</h3>
+                                    <p class="text-[9px] md:text-[10px] text-[#ff00aa]">Bendahara 2</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="murid" class="py-24 px-4 bg-dark-section relative">
+            <div class="max-w-7xl mx-auto">
+                <div class="text-center mb-10 reveal">
+                    <h2 class="text-4xl font-heading font-bold text-white mb-2">Murid Kelas X RPL</h2>
+                    <p class="text-text-secondary">Klik foto untuk melihat profil mereka ✨</p>
+                </div>
+
+                <div class="max-w-md mx-auto mb-12 reveal delay-100">
+                    <div class="relative group">
+                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-text-secondary group-focus-within:text-cyber-blue transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                        <input type="text" id="search-student" class="w-full glass border border-white/10 rounded-full py-3 pl-12 pr-4 text-white placeholder-text-secondary focus:border-cyber-blue focus:ring-1 focus:ring-cyber-blue focus:outline-none transition-all" placeholder="🔍 Cari nama murid...">
+                    </div>
+                </div>
+
+                <div id="students-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6 min-h-[400px]"></div>
+                
+                <div id="no-results" class="hidden text-center py-12">
+                    <p class="text-text-secondary text-lg">Tidak ada murid dengan nama tersebut 😢</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="projek" class="py-24 px-4 bg-dark-alt">
+            <div class="max-w-7xl mx-auto">
+                <div class="text-center mb-16 reveal">
+                    <h2 class="text-4xl font-heading font-bold text-white mb-4">Projek Kami</h2>
+                    <p class="text-text-secondary">Karya-karya terbaik hasil ngoding kelas X RPL</p>
+                    <div class="w-24 h-1 bg-gradient-to-r from-neon-green to-cyber-blue mx-auto rounded-full mt-6"></div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <article class="glass rounded-2xl overflow-hidden group reveal hover:-translate-y-2 transition-transform duration-300">
+                        <div class="aspect-video w-full overflow-hidden relative">
+                            <img src="https://placehold.co/600x400/2d3436/00d4ff?text=Web+Sekolah" alt="Website Sekolah" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" loading="lazy">
+                        </div>
+                        <div class="p-6">
+                            <h3 class="text-xl font-heading font-bold text-white mb-2 group-hover:text-cyber-blue transition-colors">Website Sekolah</h3>
+                            <p class="text-sm text-text-secondary mb-4 line-clamp-2">Website informatif untuk sekolah dengan sistem berita dan informasi akademik berbasis CMS.</p>
+                            <div class="flex flex-wrap gap-2 mb-4">
+                                <span class="px-3 py-1 rounded-full text-xs font-mono bg-cyber-blue/10 text-cyber-blue border border-cyber-blue/20">HTML</span>
+                                <span class="px-3 py-1 rounded-full text-xs font-mono bg-cyber-blue/10 text-cyber-blue border border-cyber-blue/20">CSS</span>
+                                <span class="px-3 py-1 rounded-full text-xs font-mono bg-cyber-blue/10 text-cyber-blue border border-cyber-blue/20">JS</span>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="glass rounded-2xl overflow-hidden group reveal delay-100 hover:-translate-y-2 transition-transform duration-300">
+                        <div class="aspect-video w-full overflow-hidden relative">
+                            <img src="https://placehold.co/600x400/2d3436/7b2ff7?text=App+Perpus" alt="Aplikasi Perpustakaan" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" loading="lazy">
+                        </div>
+                        <div class="p-6">
+                            <h3 class="text-xl font-heading font-bold text-white mb-2 group-hover:text-electric-purple transition-colors">Aplikasi Perpustakaan</h3>
+                            <p class="text-sm text-text-secondary mb-4 line-clamp-2">Sistem manajemen perpustakaan digital dengan fitur peminjaman, denda, dan katalog buku.</p>
+                            <div class="flex flex-wrap gap-2 mb-4">
+                                <span class="px-3 py-1 rounded-full text-xs font-mono bg-electric-purple/10 text-electric-purple border border-electric-purple/20">PHP</span>
+                                <span class="px-3 py-1 rounded-full text-xs font-mono bg-electric-purple/10 text-electric-purple border border-electric-purple/20">MySQL</span>
+                                <span class="px-3 py-1 rounded-full text-xs font-mono bg-electric-purple/10 text-electric-purple border border-electric-purple/20">Bootstrap</span>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="glass rounded-2xl overflow-hidden group reveal delay-200 hover:-translate-y-2 transition-transform duration-300">
+                        <div class="aspect-video w-full overflow-hidden relative">
+                            <img src="https://placehold.co/600x400/2d3436/00ff88?text=Game+Math" alt="Game Edukasi" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" loading="lazy">
+                        </div>
+                        <div class="p-6">
+                            <h3 class="text-xl font-heading font-bold text-white mb-2 group-hover:text-neon-green transition-colors">Game Edukasi</h3>
+                            <p class="text-sm text-text-secondary mb-4 line-clamp-2">Game interaktif 2D berbasis canvas untuk membantu siswa SD belajar matematika dengan seru.</p>
+                            <div class="flex flex-wrap gap-2 mb-4">
+                                <span class="px-3 py-1 rounded-full text-xs font-mono bg-neon-green/10 text-neon-green border border-neon-green/20">Canvas API</span>
+                                <span class="px-3 py-1 rounded-full text-xs font-mono bg-neon-green/10 text-neon-green border border-neon-green/20">JS OOP</span>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section id="memori" class="py-24 px-4 bg-dark-section">
+            <div class="max-w-7xl mx-auto">
+                <div class="text-center mb-10 reveal">
+                    <h2 class="text-4xl font-heading font-bold text-white mb-2">Memori Kelas 📸</h2>
+                    <p class="text-text-secondary">Momen-momen berharga yang tak terlupakan</p>
+                </div>
+
+                <div class="flex gap-2 justify-start md:justify-center overflow-x-auto pb-4 mb-8 hide-scrollbar reveal">
+                    <button class="filter-btn active whitespace-nowrap px-5 py-2 rounded-full text-sm font-medium transition-all bg-gradient-to-r from-cyber-blue to-electric-purple text-white" data-filter="all">Semua</button>
+                    <button class="filter-btn whitespace-nowrap px-5 py-2 rounded-full text-sm font-medium transition-all bg-white/5 text-text-secondary hover:bg-white/10 hover:text-white" data-filter="belajar">Kegiatan Belajar</button>
+                    <button class="filter-btn whitespace-nowrap px-5 py-2 rounded-full text-sm font-medium transition-all bg-white/5 text-text-secondary hover:bg-white/10 hover:text-white" data-filter="keseruan">Keseruan</button>
+                    <button class="filter-btn whitespace-nowrap px-5 py-2 rounded-full text-sm font-medium transition-all bg-white/5 text-text-secondary hover:bg-white/10 hover:text-white" data-filter="event">Event</button>
+                    <button class="filter-btn whitespace-nowrap px-5 py-2 rounded-full text-sm font-medium transition-all bg-white/5 text-text-secondary hover:bg-white/10 hover:text-white" data-filter="candid">Candid</button>
+                </div>
+
+                <div id="gallery-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 auto-rows-[150px] md:auto-rows-[200px]"></div>
+            </div>
+        </section>
+
+        <section id="guestbook" class="py-24 px-4 bg-dark-alt relative">
+            <div class="max-w-4xl mx-auto">
+                <div class="text-center mb-10 reveal">
+                    <h2 class="text-4xl font-heading font-bold text-white mb-2">Buku Tamu 📝</h2>
+                    <p class="text-text-secondary">Tinggalkan pesan, kesan, atau salam untuk kelas X RPL!</p>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 reveal">
+                    <div class="glass p-6 rounded-2xl">
+                        <form id="guestbook-form" class="space-y-4">
+                            <div>
+                                <input type="text" id="gb-name" required placeholder="Nama Kamu" class="w-full bg-dark-bg border border-white/10 rounded-lg px-4 py-3 text-white focus:border-cyber-blue focus:outline-none transition-colors">
+                            </div>
+                            <div>
+                                <textarea id="gb-message" required rows="3" placeholder="Pesan kamu..." class="w-full bg-dark-bg border border-white/10 rounded-lg px-4 py-3 text-white focus:border-electric-purple focus:outline-none transition-colors resize-none"></textarea>
+                            </div>
+                            <button type="submit" class="w-full bg-gradient-to-r from-cyber-blue to-electric-purple text-white font-bold py-3 rounded-lg hover:scale-[1.02] transition-transform shadow-[0_4px_15px_rgba(0,212,255,0.3)]">Kirim Pesan</button>
+                        </form>
+                    </div>
+                    
+                    <div class="glass p-6 rounded-2xl max-h-[300px] overflow-y-auto hide-scrollbar" id="guestbook-list">
+                        <p class="text-text-secondary text-center italic mt-10" id="gb-empty">Belum ada pesan. Jadilah yang pertama!</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-dark-bg pt-16 pb-8 px-4 footer-gradient-border">
+        <div class="max-w-4xl mx-auto text-center">
+            <a href="#home" class="font-heading text-3xl font-bold bg-gradient-to-r from-cyber-blue to-electric-purple bg-clip-text text-transparent inline-block mb-4">
+                &lt;X_RPL/&gt;
+            </a>
+            <p class="text-text-secondary italic text-lg mb-8">"Terima kasih telah menjadi bagian dari keluarga X RPL ❤️"</p>
+            
+            <div class="flex justify-center gap-4 mb-10">
+                <a href="#" aria-label="Instagram" class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-xl hover:bg-cyber-blue/20 hover:text-cyber-blue hover:-translate-y-1 transition-all">📸</a>
+                <a href="#" aria-label="YouTube" class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-xl hover:bg-electric-purple/20 hover:text-electric-purple hover:-translate-y-1 transition-all">▶️</a>
+                <a href="#" aria-label="GitHub" class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-xl hover:bg-white/20 hover:text-white hover:-translate-y-1 transition-all">💻</a>
+            </div>
+
+            <div class="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+                <p class="text-xs text-text-secondary">© 2024 Kelas X RPL. All rights reserved.</p>
+                <button onclick="window.scrollTo({top: 0, behavior: 'smooth'})" class="text-cyber-blue text-sm hover:underline font-medium">Kembali ke Atas ↑</button>
+            </div>
+        </div>
+    </footer>
+
+    <button id="back-to-top" aria-label="Kembali ke atas" class="fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full bg-gradient-to-r from-cyber-blue to-electric-purple flex items-center justify-center text-white text-xl shadow-[0_4px_15px_rgba(0,212,255,0.4)] opacity-0 pointer-events-none translate-y-10 transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-white">
+        ↑
+    </button>
+
+    <div id="student-modal" role="dialog" aria-modal="true" class="fixed inset-0 z-[60] hidden">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm modal-overlay transition-opacity duration-300 opacity-0"></div>
+        <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
+            <div class="bg-dark-section border border-white/10 rounded-3xl max-w-lg w-full max-h-[85vh] overflow-y-auto pointer-events-auto transform scale-90 opacity-0 transition-all duration-300 modal-content shadow-2xl">
+                <button aria-label="Tutup modal" class="modal-close absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-cyber-blue hover:text-dark-bg text-text-secondary transition-colors z-10 focus-outline-none">✕</button>
+                <div class="p-8">
+                    <div class="flex flex-col items-center mb-6">
+                        <img id="modal-img" src="" alt="Foto profil" class="w-28 h-28 rounded-full border-4 border-dark-bg shadow-[0_0_0_2px_#00d4ff] object-cover mb-4">
+                        <h2 id="modal-name" class="text-3xl font-heading font-bold text-white mb-1 text-center">Nama Murid</h2>
+                        <span id="modal-absen" class="text-sm px-3 py-1 rounded-full bg-white/10 text-text-secondary font-mono">No. Absen 0</span>
+                    </div>
+                    <div class="space-y-6">
+                        <div class="bg-dark-bg rounded-xl p-4 border-l-4 border-cyber-blue">
+                            <p id="modal-quote" class="italic text-text-secondary text-sm leading-relaxed">"Quote goes here."</p>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="glass p-3 rounded-xl text-center">
+                                <span class="block text-xs text-text-secondary mb-1">Motto</span>
+                                <span id="modal-motto" class="text-sm font-semibold text-neon-green">Motto here</span>
+                            </div>
+                            <div class="glass p-3 rounded-xl text-center">
+                                <span class="block text-xs text-text-secondary mb-1">Cita-cita</span>
+                                <span id="modal-dream" class="text-sm font-semibold text-electric-purple">Dream here</span>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-semibold text-white mb-3 flex items-center"><span class="mr-2">📸</span> Snapshot</h3>
+                            <div class="grid grid-cols-3 gap-2" id="modal-gallery"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="lightbox" role="dialog" aria-modal="true" class="fixed inset-0 z-[70] hidden">
+        <div class="absolute inset-0 bg-black/95 backdrop-blur-md lightbox-overlay transition-opacity duration-300 opacity-0"></div>
+        <button aria-label="Tutup lightbox" class="lightbox-close absolute top-6 right-6 text-white hover:text-cyber-blue text-4xl z-10 transition-colors focus-outline-none">&times;</button>
+        <div class="absolute top-6 left-1/2 -translate-x-1/2 text-text-secondary font-mono text-sm z-10 bg-black/50 px-4 py-1 rounded-full backdrop-blur-sm">
+            <span id="lightbox-counter">1 / 12</span>
+        </div>
+        <button id="lightbox-prev" aria-label="Foto sebelumnya" class="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center z-10 transition-colors focus-outline-none backdrop-blur-sm">❮</button>
+        <button id="lightbox-next" aria-label="Foto selanjutnya" class="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center z-10 transition-colors focus-outline-none backdrop-blur-sm">❯</button>
+        <div class="absolute inset-0 flex flex-col items-center justify-center p-4 md:p-12 pointer-events-none">
+            <img id="lightbox-img" src="" alt="Foto galeri diperbesar" class="max-w-full max-h-[75vh] object-contain shadow-2xl rounded-sm transform scale-95 opacity-0 transition-all duration-300 pointer-events-auto">
+            <p id="lightbox-caption" class="text-white text-lg mt-6 font-medium text-center opacity-0 transition-opacity duration-300 delay-100"></p>
+        </div>
+    </div>
+
+    <!-- Snapshot Lightbox -->
+    <div id="snap-lightbox" role="dialog" aria-modal="true" class="fixed inset-0 z-[90] hidden">
+        <div id="snap-lb-overlay" class="absolute inset-0 bg-black/95 backdrop-blur-md opacity-0 transition-opacity duration-300"></div>
+        <button id="snap-lb-close" class="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white text-xl flex items-center justify-center transition-all">✕</button>
+        <div id="snap-lb-inner" class="absolute inset-0 flex flex-col md:flex-row opacity-0 transition-opacity duration-300 delay-100">
+            <!-- Image side -->
+            <div class="flex-1 flex flex-col items-center justify-center p-4 md:p-10 min-h-0">
+                <img id="snap-lb-img" src="" alt="Snapshot" class="max-w-full max-h-[52vh] md:max-h-[75vh] object-contain rounded-2xl shadow-2xl">
+                <div class="flex gap-3 mt-5">
+                    <button id="snap-lb-like-btn" class="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/10 hover:bg-red-500/30 border border-white/20 hover:border-red-400 text-white text-sm font-semibold transition-all">
+                        <span id="snap-lb-heart">🤍</span> <span id="snap-lb-like-count">0</span> Suka
+                    </button>
+                    <button id="snap-lb-download-btn" class="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/10 hover:bg-cyber-blue/30 border border-white/20 hover:border-cyber-blue text-white text-sm font-semibold transition-all">
+                        ⬇️ Download
+                    </button>
+                </div>
+            </div>
+            <!-- Comments side -->
+            <div class="w-full md:w-72 flex-shrink-0 flex flex-col border-t md:border-t-0 md:border-l border-white/10" style="background:rgba(11,11,20,0.97)">
+                <div class="p-4 border-b border-white/10">
+                    <p id="snap-lb-caption" class="text-white font-semibold text-sm"></p>
+                    <p id="snap-lb-meta" class="text-gray-500 text-xs mt-0.5"></p>
+                </div>
+                <div id="snap-lb-comments" class="flex-1 overflow-y-auto p-4 space-y-3 max-h-[22vh] md:max-h-none"></div>
+                <form id="snap-lb-form" class="p-3 border-t border-white/10 space-y-2">
+                    <input type="text" id="snap-lb-name" class="w-full bg-white/5 border border-white/10 text-white text-xs px-3 py-2 rounded-lg placeholder-gray-500 focus:border-cyber-blue/50 focus:outline-none" placeholder="Nama kamu *" required maxlength="50">
+                    <div class="flex gap-2">
+                        <input type="text" id="snap-lb-txt" class="flex-1 bg-white/5 border border-white/10 text-white text-xs px-3 py-2 rounded-lg placeholder-gray-500 focus:border-cyber-blue/50 focus:outline-none" placeholder="Tulis komentar..." required maxlength="200">
+                        <button type="submit" class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-cyber-blue to-electric-purple text-white text-xs font-bold">→</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+    // ── Inject Login/Dashboard button into navbar ──────────────
+    (function() {
+        const isLoggedIn = localStorage.getItem('xrpl_admin_logged_in') === 'true';
+        const btnHtml = isLoggedIn
+            ? `<a href="dashboard.html" class="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold text-dark-bg bg-gradient-to-r from-cyber-blue to-electric-purple hover:scale-105 transition-transform shadow-[0_0_15px_rgba(0,212,255,0.3)]">⚡ Dashboard</a>`
+            : `<a href="login.html" class="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold border border-cyber-blue/40 text-cyber-blue hover:bg-cyber-blue/10 transition-all">🔐 Login Admin</a>`;
+        const mobileHtml = isLoggedIn
+            ? `<a href="dashboard.html" class="text-xl font-heading font-bold bg-gradient-to-r from-cyber-blue to-electric-purple bg-clip-text text-transparent">⚡ Dashboard</a>`
+            : `<a href="login.html" class="text-xl font-heading text-cyber-blue hover:text-white transition-colors">🔐 Login Admin</a>`;
+        const navDesktop = document.getElementById('nav-auth-btn');
+        const navMobile  = document.getElementById('mobile-auth-btn');
+        if (navDesktop) navDesktop.innerHTML = btnHtml;
+        if (navMobile)  navMobile.innerHTML  = mobileHtml;
+    })();
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Admin | X RPL</title>
+    <meta name="robots" content="noindex, nofollow">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'cyber-blue': '#00d4ff',
+                        'electric-purple': '#7b2ff7',
+                        'neon-green': '#00ff88',
+                        'dark-bg': '#0a0a0f',
+                        'dark-section': '#0d0d15',
+                        'dark-alt': '#111122',
+                        'sidebar': '#08080e',
+                        'card': '#0f0f1a',
+                    },
+                    fontFamily: {
+                        heading: ['Orbitron', 'sans-serif'],
+                        body: ['Poppins', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { box-sizing: border-box; }
+        body { background: #080810; font-family: 'Poppins', sans-serif; color: #fff; margin: 0; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0a0a0f; }
+        ::-webkit-scrollbar-thumb { background: linear-gradient(#00d4ff, #7b2ff7); border-radius: 3px; }
+        .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.07); }
+        .glass-hover { transition: all 0.3s; }
+        .glass-hover:hover { background: rgba(255,255,255,0.06); border-color: rgba(0,212,255,0.3); transform: translateY(-2px); }
+        .sidebar { background: #080810; border-right: 1px solid rgba(255,255,255,0.06); width: 260px; min-height: 100vh; flex-shrink: 0; transition: transform 0.3s; }
+        .sidebar-link { display: flex; align-items: center; gap: 12px; padding: 11px 16px; border-radius: 12px; color: #6b7280; font-size: 0.9rem; font-weight: 500; cursor: pointer; border: none; background: none; width: 100%; text-align: left; transition: all 0.2s; text-decoration: none; }
+        .sidebar-link:hover { background: rgba(0,212,255,0.07); color: #e2e8f0; }
+        .sidebar-link.active { background: linear-gradient(135deg, rgba(0,212,255,0.15), rgba(123,47,247,0.15)); color: #00d4ff; border: 1px solid rgba(0,212,255,0.2); }
+        .sidebar-link .icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; background: rgba(255,255,255,0.05); }
+        .sidebar-link.active .icon { background: linear-gradient(135deg, rgba(0,212,255,0.2), rgba(123,47,247,0.2)); }
+        .table-row { border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s; }
+        .table-row:hover { background: rgba(255,255,255,0.03); }
+        .badge { padding: 3px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
+        .input-f { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 10px 14px; border-radius: 10px; font-family: 'Poppins', sans-serif; font-size: 0.9rem; outline: none; transition: all 0.3s; width: 100%; }
+        .input-f:focus { border-color: #00d4ff; box-shadow: 0 0 0 3px rgba(0,212,255,0.12); }
+        .input-f::placeholder { color: #4b5563; }
+        .btn-primary { background: linear-gradient(135deg, #00d4ff, #7b2ff7); color: #fff; border: none; padding: 10px 20px; border-radius: 10px; font-weight: 600; cursor: pointer; font-family: 'Poppins', sans-serif; font-size: 0.9rem; transition: all 0.3s; }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,212,255,0.3); }
+        .btn-danger { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); padding: 7px 14px; border-radius: 8px; font-weight: 500; cursor: pointer; font-family: 'Poppins', sans-serif; font-size: 0.82rem; transition: all 0.2s; }
+        .btn-danger:hover { background: rgba(239,68,68,0.25); }
+        .btn-edit { background: rgba(0,212,255,0.1); color: #67e8f9; border: 1px solid rgba(0,212,255,0.2); padding: 7px 14px; border-radius: 8px; font-weight: 500; cursor: pointer; font-family: 'Poppins', sans-serif; font-size: 0.82rem; transition: all 0.2s; }
+        .btn-edit:hover { background: rgba(0,212,255,0.2); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.4s ease; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+        .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 100; display: none; align-items: center; justify-content: center; padding: 16px; }
+        .modal-bg.open { display: flex; animation: fadeIn 0.3s ease; }
+        .modal-card { background: #0f0f1a; border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; width: 100%; max-width: 540px; max-height: 90vh; overflow-y: auto; padding: 32px; }
+        .upload-zone { border: 2px dashed rgba(0,212,255,0.3); border-radius: 14px; padding: 32px; text-align: center; cursor: pointer; transition: all 0.3s; }
+        .upload-zone:hover, .upload-zone.drag-over { border-color: #00d4ff; background: rgba(0,212,255,0.06); }
+        .upload-zone img { max-height: 160px; object-fit: contain; border-radius: 10px; }
+        .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 39; }
+        .color-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); display: inline-block; }
+        .toast { position: fixed; bottom: 24px; right: 24px; z-index: 999; background: #0f0f1a; border: 1px solid rgba(0,212,255,0.3); color: #fff; padding: 14px 20px; border-radius: 14px; font-size: 0.88rem; min-width: 240px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); transform: translateY(100px); opacity: 0; transition: all 0.4s cubic-bezier(.34,1.56,.64,1); }
+        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast.success { border-color: rgba(0,255,136,0.4); }
+        .toast.error { border-color: rgba(239,68,68,0.4); color: #fca5a5; }
+        .avatar-preview { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(0,212,255,0.4); }
+        @media (max-width: 768px) {
+            .sidebar { position: fixed; left: 0; top: 0; z-index: 40; transform: translateX(-100%); }
+            .sidebar.open { transform: translateX(0); }
+            .sidebar-overlay.open { display: block; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Toast Notification -->
+<div id="toast" class="toast">
+    <span id="toast-icon">✅</span> <span id="toast-msg">Berhasil!</span>
+</div>
+
+<!-- Sidebar Overlay (mobile) -->
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<div class="flex min-h-screen">
+
+    <!-- ==================== SIDEBAR ==================== -->
+    <aside class="sidebar" id="sidebar">
+        <div class="p-6">
+            <!-- Logo -->
+            <div class="mb-8">
+                <a href="index.html" class="font-heading text-xl font-black bg-gradient-to-r from-cyber-blue to-electric-purple bg-clip-text text-transparent">&lt;X_RPL/&gt;</a>
+                <p class="text-xs text-gray-600 mt-0.5">Admin Dashboard</p>
+            </div>
+
+            <!-- User Info -->
+            <div class="glass rounded-2xl p-4 mb-6 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-cyber-blue to-electric-purple flex items-center justify-center text-sm font-bold flex-shrink-0" id="user-avatar">A</div>
+                <div class="overflow-hidden">
+                    <p class="text-sm font-semibold text-white truncate" id="user-name">Administrator</p>
+                    <p class="text-xs text-gray-500" id="user-role">Admin</p>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="space-y-1">
+                <button class="sidebar-link active admin-only" data-tab="overview" onclick="switchTab('overview')">
+                    <span class="icon">📊</span> Overview
+                </button>
+                <button class="sidebar-link admin-only" data-tab="students" onclick="switchTab('students')">
+                    <span class="icon">👥</span> Murid
+                    <span class="ml-auto text-xs bg-cyber-blue/20 text-cyber-blue px-2 py-0.5 rounded-full" id="student-count-badge">0</span>
+                </button>
+                <button class="sidebar-link admin-only" data-tab="struktur" onclick="switchTab('struktur')">
+                    <span class="icon">🏛️</span> Struktur Organisasi
+                </button>
+                <button class="sidebar-link admin-only" data-tab="projects" onclick="switchTab('projects')">
+                    <span class="icon">💻</span> Projek
+                </button>
+                <button class="sidebar-link admin-only" data-tab="gallery" onclick="switchTab('gallery')">
+                    <span class="icon">📸</span> Gallery
+                </button>
+                <button class="sidebar-link admin-only" data-tab="guestbook" onclick="switchTab('guestbook')">
+                    <span class="icon">📝</span> Guestbook
+                    <span class="ml-auto text-xs bg-electric-purple/20 text-electric-purple px-2 py-0.5 rounded-full" id="gb-count-badge">0</span>
+                </button>
+                <button class="sidebar-link admin-only" data-tab="accounts" onclick="switchTab('accounts')">
+                    <span class="icon">🔑</span> Akun Murid
+                </button>
+                <button class="sidebar-link admin-only" data-tab="settings" onclick="switchTab('settings')">
+                    <span class="icon">⚙️</span> Pengaturan
+                </button>
+                <!-- Student-only -->
+                <button class="sidebar-link student-only hidden" data-tab="my-profile" onclick="switchTab('my-profile')">
+                    <span class="icon">👤</span> Profil Saya
+                </button>
+                <button class="sidebar-link student-only hidden" data-tab="my-snapshots" onclick="switchTab('my-snapshots')">
+                    <span class="icon">📷</span> My Snapshots
+                </button>
+                <button class="sidebar-link student-only hidden" data-tab="settings" onclick="switchTab('settings')">
+                    <span class="icon">⚙️</span> Pengaturan
+                </button>
+            </nav>
+
+            <!-- Divider -->
+            <div class="border-t border-white/5 my-4"></div>
+
+            <!-- Links -->
+            <a href="index.html" class="sidebar-link" target="_blank">
+                <span class="icon">🌐</span> Lihat Website
+            </a>
+            <button class="sidebar-link text-red-400 hover:text-red-300" onclick="logout()">
+                <span class="icon" style="background:rgba(239,68,68,0.1)">🚪</span> Logout
+            </button>
+        </div>
+    </aside>
+
+    <!-- ==================== MAIN CONTENT ==================== -->
+    <div class="flex-1 flex flex-col min-w-0">
+
+        <!-- Top Bar -->
+        <header class="sticky top-0 z-30 flex items-center justify-between px-6 py-4 border-b border-white/5" style="background:#080810">
+            <div class="flex items-center gap-4">
+                <button class="md:hidden w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-gray-400 hover:text-white" onclick="toggleSidebar()">☰</button>
+                <div>
+                    <h1 class="text-white font-heading font-bold text-lg" id="page-title">Overview</h1>
+                    <p class="text-xs text-gray-500 hidden sm:block" id="page-subtitle">Kelola semua konten website X RPL</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <a href="index.html" target="_blank" class="hidden sm:flex items-center gap-2 text-xs text-gray-400 hover:text-cyber-blue transition-colors border border-white/10 rounded-lg px-3 py-2">
+                    🔗 <span>Lihat Website</span>
+                </a>
+            </div>
+        </header>
+
+        <!-- Content Area -->
+        <main class="flex-1 p-4 md:p-6 overflow-auto">
+
+            <!-- ==================== OVERVIEW ==================== -->
+            <div class="tab-content active" id="tab-overview">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    <div class="glass rounded-2xl p-5 glass-hover">
+                        <div class="text-3xl mb-2">👥</div>
+                        <div class="text-2xl font-heading font-bold text-cyber-blue" id="ov-students">0</div>
+                        <div class="text-xs text-gray-500 mt-1">Total Murid</div>
+                    </div>
+                    <div class="glass rounded-2xl p-5 glass-hover">
+                        <div class="text-3xl mb-2">💻</div>
+                        <div class="text-2xl font-heading font-bold text-electric-purple" id="ov-projects">0</div>
+                        <div class="text-xs text-gray-500 mt-1">Total Projek</div>
+                    </div>
+                    <div class="glass rounded-2xl p-5 glass-hover">
+                        <div class="text-3xl mb-2">📸</div>
+                        <div class="text-2xl font-heading font-bold text-neon-green" id="ov-gallery">0</div>
+                        <div class="text-xs text-gray-500 mt-1">Total Foto Gallery</div>
+                    </div>
+                    <div class="glass rounded-2xl p-5 glass-hover">
+                        <div class="text-3xl mb-2">📝</div>
+                        <div class="text-2xl font-heading font-bold text-yellow-400" id="ov-guestbook">0</div>
+                        <div class="text-xs text-gray-500 mt-1">Pesan Guestbook</div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="glass rounded-2xl p-6 mb-6">
+                    <h2 class="text-white font-semibold mb-4 flex items-center gap-2">⚡ Aksi Cepat</h2>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <button onclick="switchTab('students'); openStudentModal()" class="glass glass-hover rounded-xl p-4 text-center text-sm text-gray-300">
+                            <div class="text-2xl mb-2">➕</div>Tambah Murid
+                        </button>
+                        <button onclick="switchTab('projects'); openProjectModal()" class="glass glass-hover rounded-xl p-4 text-center text-sm text-gray-300">
+                            <div class="text-2xl mb-2">🛠️</div>Tambah Projek
+                        </button>
+                        <button onclick="switchTab('gallery'); openGalleryModal()" class="glass glass-hover rounded-xl p-4 text-center text-sm text-gray-300">
+                            <div class="text-2xl mb-2">📷</div>Upload Foto
+                        </button>
+                        <button onclick="switchTab('guestbook')" class="glass glass-hover rounded-xl p-4 text-center text-sm text-gray-300">
+                            <div class="text-2xl mb-2">💬</div>Kelola Pesan
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Recent Guestbook -->
+                <div class="glass rounded-2xl p-6">
+                    <h2 class="text-white font-semibold mb-4 flex items-center gap-2">📝 Pesan Terbaru</h2>
+                    <div id="ov-recent-messages" class="space-y-3"></div>
+                </div>
+            </div>
+
+            <!-- ==================== MURID ==================== -->
+            <div class="tab-content" id="tab-students">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                    <div class="relative flex-1 max-w-xs">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">🔍</span>
+                        <input type="text" id="search-students" class="input-f pl-9" placeholder="Cari nama murid...">
+                    </div>
+                    <button class="btn-primary flex items-center gap-2" onclick="openStudentModal()">
+                        ➕ Tambah Murid
+                    </button>
+                </div>
+
+                <div class="glass rounded-2xl overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-white/5 text-gray-500 text-xs uppercase tracking-wider">
+                                    <th class="text-left p-4 font-medium">Murid</th>
+                                    <th class="text-left p-4 font-medium hidden md:table-cell">Cita-cita</th>
+                                    <th class="text-left p-4 font-medium hidden lg:table-cell">Motto</th>
+                                    <th class="text-left p-4 font-medium">Foto</th>
+                                    <th class="text-right p-4 font-medium">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="students-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== STRUKTUR ==================== -->
+            <div class="tab-content" id="tab-struktur">
+                <div class="flex justify-between items-center mb-6">
+                    <p class="text-gray-400 text-sm">Kelola struktur organisasi kelas</p>
+                    <button class="btn-primary flex items-center gap-2" onclick="openStrukturModal()">
+                        ➕ Tambah Jabatan
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="struktur-grid"></div>
+            </div>
+
+            <!-- ==================== PROJEK ==================== -->
+            <div class="tab-content" id="tab-projects">
+                <div class="flex justify-between items-center mb-6">
+                    <p class="text-gray-400 text-sm">Kelola projek-projek kelas X RPL</p>
+                    <button class="btn-primary flex items-center gap-2" onclick="openProjectModal()">
+                        ➕ Tambah Projek
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" id="projects-grid"></div>
+            </div>
+
+            <!-- ==================== GALLERY ==================== -->
+            <div class="tab-content" id="tab-gallery">
+                <div class="flex justify-between items-center mb-6">
+                    <p class="text-gray-400 text-sm">Upload dan kelola foto memori kelas</p>
+                    <button class="btn-primary flex items-center gap-2" onclick="openGalleryModal()">
+                        ➕ Upload Foto
+                    </button>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" id="gallery-grid-admin"></div>
+            </div>
+
+            <!-- ==================== GUESTBOOK ==================== -->
+            <div class="tab-content" id="tab-guestbook">
+                <div class="glass rounded-2xl overflow-hidden">
+                    <div class="p-5 border-b border-white/5 flex items-center justify-between">
+                        <h2 class="font-semibold text-white">Semua Pesan Guestbook</h2>
+                        <button onclick="clearAllGuestbook()" class="btn-danger text-xs">🗑️ Hapus Semua</button>
+                    </div>
+                    <div id="guestbook-admin" class="divide-y divide-white/5"></div>
+                </div>
+            </div>
+
+            <!-- ==================== SETTINGS ==================== -->
+            <div class="tab-content" id="tab-settings">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Change Password -->
+                    <div class="glass rounded-2xl p-6">
+                        <h2 class="font-semibold text-white mb-1 flex items-center gap-2">🔐 Ganti Password</h2>
+                        <p class="text-xs text-gray-500 mb-5">Default: admin / admin123</p>
+                        <form id="change-password-form" class="space-y-4" onsubmit="changePassword(event)">
+                            <div>
+                                <label class="text-xs text-gray-400 mb-1 block">Password Lama</label>
+                                <input type="password" id="old-password" class="input-f" placeholder="••••••••" required>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-400 mb-1 block">Password Baru</label>
+                                <input type="password" id="new-password" class="input-f" placeholder="Minimal 6 karakter" required minlength="6">
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-400 mb-1 block">Konfirmasi Password Baru</label>
+                                <input type="password" id="confirm-password" class="input-f" placeholder="••••••••" required>
+                            </div>
+                            <button type="submit" class="btn-primary w-full">💾 Simpan Password</button>
+                        </form>
+                    </div>
+
+                    <!-- Info -->
+                    <div class="glass rounded-2xl p-6">
+                        <h2 class="font-semibold text-white mb-4 flex items-center gap-2">ℹ️ Informasi Sistem</h2>
+                        <div class="space-y-3 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Mode Database</span>
+                                <span class="text-cyber-blue font-mono text-xs px-2 py-1 rounded bg-cyber-blue/10">localStorage</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Status</span>
+                                <span class="text-neon-green text-xs">● Online</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Total Data Murid</span>
+                                <span class="text-white" id="info-students">0</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400">Total Projek</span>
+                                <span class="text-white" id="info-projects">0</span>
+                            </div>
+                        </div>
+                        <div class="mt-6 pt-4 border-t border-white/5">
+                            <p class="text-xs text-gray-600 mb-3">⚠️ Export/Import Data</p>
+                            <div class="flex gap-2">
+                                <button onclick="exportData()" class="flex-1 btn-edit text-xs">📥 Export JSON</button>
+                                <label class="flex-1 btn-edit text-xs text-center cursor-pointer">
+                                    📤 Import JSON
+                                    <input type="file" accept=".json" class="hidden" onchange="importData(this)">
+                                </label>
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="tab-content" id="tab-my-profile">
+                <div class="glass rounded-2xl p-6 max-w-2xl mx-auto mt-6">
+                    <h2 class="text-white font-semibold mb-6 flex items-center gap-2">👤 Update Profil Saya</h2>
+                    
+                    <div class="mb-6 border-b border-white/10 pb-6 flex items-center gap-6">
+                        <div class="relative group cursor-pointer" onclick="document.getElementById('my-photo-upload').click()">
+                            <img id="my-photo-preview" src="" class="avatar-preview shadow-xl group-hover:opacity-70 transition-opacity">
+                            <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                <span class="text-white text-2xl drop-shadow-md">📷</span>
+                            </div>
+                            <input type="file" id="my-photo-upload" accept="image/*" class="hidden" onchange="uploadMyPhoto(this)">
+                        </div>
+                        <div>
+                            <p class="text-xs text-cyber-blue mb-1">Klik foto untuk mengganti avatar</p>
+                            <p class="text-xs text-gray-500">Gunakan rasio 1:1, maks 5MB.</p>
+                        </div>
+                    </div>
+
+                    <form id="my-profile-form" class="space-y-4" onsubmit="saveMyProfile(event)">
+                        <div>
+                            <label class="text-xs text-gray-400 mb-1 block">Motto Kehidupan</label>
+                            <input type="text" id="my-motto" class="input-f" placeholder="Contoh: Stay Hungry, Stay Foolish">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400 mb-1 block">Cita-cita</label>
+                            <input type="text" id="my-dream" class="input-f" placeholder="Contoh: Fullstack Developer">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400 mb-1 block">Quote / Kesan Pesan</label>
+                            <textarea id="my-quote" class="input-f resize-none" rows="3"></textarea>
+                        </div>
+                        <button type="submit" class="btn-primary w-full mt-2">💾 Simpan Profil</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- ==================== MY SNAPSHOTS (STUDENT ONLY) ==================== -->
+            <div class="tab-content" id="tab-my-snapshots">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                    <div>
+                        <h2 class="text-white font-semibold">📷 Foto Snapshot Saya</h2>
+                        <p class="text-xs text-gray-400">Bagikan momen terbaikmu dengan teman sekelas.</p>
+                    </div>
+                    <button class="btn-primary flex items-center gap-2" onclick="openMySnapshotModal()">
+                        ➕ Upload Snapshot
+                    </button>
+                </div>
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="my-snapshots-grid"></div>
+            </div>
+
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- ==================== MODALS ==================== -->
+
+<!-- Snapshot Modal (Student) -->
+<div class="modal-bg" id="snapshot-modal">
+    <div class="modal-card">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-white font-heading font-bold text-lg">Upload Snapshot</h2>
+            <button onclick="closeModal('snapshot-modal')" class="w-8 h-8 rounded-lg bg-white/5 text-gray-400 flex items-center justify-center">✕</button>
+        </div>
+        <form id="snapshot-form" class="space-y-4" onsubmit="saveMySnapshot(event)">
+            <div>
+                <label class="text-xs text-gray-400 mb-1 block">Upload Foto</label>
+                <div class="upload-zone" id="snapshot-upload-zone" onclick="document.getElementById('snapshot-input').click()">
+                    <input type="file" id="snapshot-input" accept="image/*" class="hidden" required onchange="previewSnapshotImage(this)">
+                    <img id="snapshot-preview" src="" class="hidden mx-auto mb-2 rounded-lg max-h-48">
+                    <div id="snapshot-placeholder">
+                        <p class="text-3xl mb-1 mt-2 text-center text-gray-400">📷</p>
+                        <p class="text-xs text-gray-500 text-center">Klik atau drag foto ke sini</p>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <label class="text-xs text-gray-400 mb-1 block">Caption / Keterangan Keren</label>
+                <input type="text" id="snapshot-caption" class="input-f" placeholder="Contoh: Ngerjain project akhir uas!" required>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeModal('snapshot-modal')" class="flex-1 py-2.5 rounded-xl border border-white/10 text-gray-400 text-sm">Batal</button>
+                <button type="submit" class="flex-1 btn-primary" id="snapshot-save-btn">📤 Upload</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Student Modal -->
+<div class="modal-bg" id="student-modal">
+    <div class="modal-card">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-white font-heading font-bold text-lg" id="student-modal-title">Tambah Murid</h2>
+            <button onclick="closeModal('student-modal')" class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 flex items-center justify-center">✕</button>
+        </div>
+
+        <!-- Photo Upload -->
+        <div class="mb-5">
+            <label class="text-xs text-gray-400 mb-2 block uppercase tracking-wider">Foto Profil</label>
+            <div class="flex items-center gap-4">
+                <div class="w-20 h-20 rounded-full overflow-hidden border-2 border-cyber-blue/30 flex-shrink-0 bg-white/5" id="student-photo-preview-wrap">
+                    <img id="student-photo-preview" src="" alt="" class="w-full h-full object-cover hidden">
+                    <div id="student-photo-placeholder" class="w-full h-full flex items-center justify-center text-2xl text-gray-600">👤</div>
+                </div>
+                <div class="flex-1">
+                    <div class="upload-zone" id="student-upload-zone">
+                        <input type="file" id="student-photo-input" accept="image/*" class="hidden" onchange="previewStudentPhoto(this)">
+                        <p class="text-xs text-gray-500 mb-2">Drag & drop atau klik untuk upload</p>
+                        <p class="text-xs text-gray-600">JPG, PNG, WebP — Maks 5MB</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <form id="student-form" class="space-y-4">
+            <input type="hidden" id="student-id">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="col-span-2">
+                    <label class="text-xs text-gray-400 mb-1 block">Nama Lengkap *</label>
+                    <input type="text" id="student-name" class="input-f" placeholder="Ahmad Rizky" required>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Cita-cita</label>
+                    <input type="text" id="student-dream" class="input-f" placeholder="Fullstack Developer">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Warna Avatar</label>
+                    <div class="flex gap-2 flex-wrap mt-1">
+                        <button type="button" class="color-pick w-7 h-7 rounded-full border-2 border-transparent hover:scale-110 transition-transform" style="background:#00d4ff" data-color="00d4ff" onclick="setStudentColor('00d4ff', this)"></button>
+                        <button type="button" class="color-pick w-7 h-7 rounded-full border-2 border-transparent hover:scale-110 transition-transform" style="background:#7b2ff7" data-color="7b2ff7" onclick="setStudentColor('7b2ff7', this)"></button>
+                        <button type="button" class="color-pick w-7 h-7 rounded-full border-2 border-transparent hover:scale-110 transition-transform" style="background:#00ff88" data-color="00ff88" onclick="setStudentColor('00ff88', this)"></button>
+                        <button type="button" class="color-pick w-7 h-7 rounded-full border-2 border-transparent hover:scale-110 transition-transform" style="background:#ff00aa" data-color="ff00aa" onclick="setStudentColor('ff00aa', this)"></button>
+                        <button type="button" class="color-pick w-7 h-7 rounded-full border-2 border-transparent hover:scale-110 transition-transform" style="background:#ffae00" data-color="ffae00" onclick="setStudentColor('ffae00', this)"></button>
+                    </div>
+                    <input type="hidden" id="student-color" value="00d4ff">
+                </div>
+                <div class="col-span-2">
+                    <label class="text-xs text-gray-400 mb-1 block">Motto</label>
+                    <input type="text" id="student-motto" class="input-f" placeholder="Stay Hungry, Stay Foolish">
+                </div>
+                <div class="col-span-2">
+                    <label class="text-xs text-gray-400 mb-1 block">Quote / Kutipan</label>
+                    <textarea id="student-quote" class="input-f resize-none" rows="3" placeholder="Kata-kata inspiratif dari murid..."></textarea>
+                </div>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeModal('student-modal')" class="flex-1 py-2.5 rounded-xl border border-white/10 text-gray-400 hover:border-white/20 hover:text-white transition-all text-sm">Batal</button>
+                <button type="submit" class="flex-1 btn-primary">💾 Simpan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Struktur Modal -->
+<div class="modal-bg" id="struktur-modal">
+    <div class="modal-card">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-white font-heading font-bold text-lg" id="struktur-modal-title">Tambah Struktur</h2>
+            <button onclick="closeModal('struktur-modal')" class="w-8 h-8 rounded-lg bg-white/5 text-gray-400 flex items-center justify-center">✕</button>
+        </div>
+        <form id="struktur-form" class="space-y-4">
+            <input type="hidden" id="struktur-id">
+            <div>
+                <label class="text-xs text-gray-400 mb-1 block">Nama *</label>
+                <input type="text" id="struktur-name" class="input-f" placeholder="Nama lengkap" required>
+            </div>
+            <div>
+                <label class="text-xs text-gray-400 mb-1 block">Jabatan *</label>
+                <input type="text" id="struktur-jabatan" class="input-f" placeholder="Ketua Kelas" required>
+            </div>
+            <div>
+                <label class="text-xs text-gray-400 mb-1 block">Level Hierarki</label>
+                <select id="struktur-level" class="input-f">
+                    <option value="0">Level 0 — Wali Kelas (Paling Atas)</option>
+                    <option value="1">Level 1 — Ketua / Wakil Ketua</option>
+                    <option value="2">Level 2 — Sekretaris / Bendahara</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs text-gray-400 mb-1 block">Warna Aksen</label>
+                <div class="flex gap-2">
+                    <button type="button" class="str-color-pick w-7 h-7 rounded-full hover:scale-110 transition-transform" style="background:#00d4ff;border:2px solid white" data-color="00d4ff" onclick="setStrukturColor('00d4ff', this)"></button>
+                    <button type="button" class="str-color-pick w-7 h-7 rounded-full hover:scale-110 transition-transform border-2 border-transparent" style="background:#7b2ff7" data-color="7b2ff7" onclick="setStrukturColor('7b2ff7', this)"></button>
+                    <button type="button" class="str-color-pick w-7 h-7 rounded-full hover:scale-110 transition-transform border-2 border-transparent" style="background:#00ff88" data-color="00ff88" onclick="setStrukturColor('00ff88', this)"></button>
+                    <button type="button" class="str-color-pick w-7 h-7 rounded-full hover:scale-110 transition-transform border-2 border-transparent" style="background:#ff00aa" data-color="ff00aa" onclick="setStrukturColor('ff00aa', this)"></button>
+                </div>
+                <input type="hidden" id="struktur-color" value="00d4ff">
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeModal('struktur-modal')" class="flex-1 py-2.5 rounded-xl border border-white/10 text-gray-400 text-sm">Batal</button>
+                <button type="submit" class="flex-1 btn-primary">💾 Simpan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Project Modal -->
+<div class="modal-bg" id="project-modal">
+    <div class="modal-card">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-white font-heading font-bold text-lg" id="project-modal-title">Tambah Projek</h2>
+            <button onclick="closeModal('project-modal')" class="w-8 h-8 rounded-lg bg-white/5 text-gray-400 flex items-center justify-center">✕</button>
+        </div>
+        <form id="project-form" class="space-y-4">
+            <input type="hidden" id="project-id">
+            <div>
+                <label class="text-xs text-gray-400 mb-1 block">Judul Projek *</label>
+                <input type="text" id="project-title" class="input-f" placeholder="Website Sekolah" required>
+            </div>
+            <div>
+                <label class="text-xs text-gray-400 mb-1 block">Deskripsi</label>
+                <textarea id="project-desc" class="input-f resize-none" rows="3" placeholder="Deskripsi singkat projek..."></textarea>
+            </div>
+            <div>
+                <label class="text-xs text-gray-400 mb-1 block">Tags Teknologi (pisah dengan koma)</label>
+                <input type="text" id="project-tags" class="input-f" placeholder="HTML, CSS, JavaScript">
+            </div>
+            <div>
+                <label class="text-xs text-gray-400 mb-1 block">Link Projek (opsional)</label>
+                <input type="url" id="project-link" class="input-f" placeholder="https://...">
+            </div>
+            <div>
+                <label class="text-xs text-gray-400 mb-1 block">Upload Gambar Projek</label>
+                <div class="upload-zone" id="project-upload-zone" onclick="document.getElementById('project-img-input').click()">
+                    <input type="file" id="project-img-input" accept="image/*" class="hidden" onchange="previewProjectImage(this)">
+                    <div id="project-img-preview-wrap">
+                        <p class="text-2xl mb-1">🖼️</p>
+                        <p class="text-xs text-gray-500">Klik untuk upload gambar</p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeModal('project-modal')" class="flex-1 py-2.5 rounded-xl border border-white/10 text-gray-400 text-sm">Batal</button>
+                <button type="submit" class="flex-1 btn-primary">💾 Simpan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Gallery Modal -->
+<div class="modal-bg" id="gallery-modal">
+    <div class="modal-card">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-white font-heading font-bold text-lg">Upload Foto Gallery</h2>
+            <button onclick="closeModal('gallery-modal')" class="w-8 h-8 rounded-lg bg-white/5 text-gray-400 flex items-center justify-center">✕</button>
+        </div>
+        <form id="gallery-form" class="space-y-4">
+            <input type="hidden" id="gallery-id">
+            <div>
+                <label class="text-xs text-gray-400 mb-1 block">Judul Foto *</label>
+                <input type="text" id="gallery-title" class="input-f" placeholder="Hari Pertama Sekolah" required>
+            </div>
+            <div>
+                <label class="text-xs text-gray-400 mb-1 block">Kategori *</label>
+                <select id="gallery-category" class="input-f">
+                    <option value="event">Event</option>
+                    <option value="belajar">Kegiatan Belajar</option>
+                    <option value="keseruan">Keseruan</option>
+                    <option value="candid">Candid</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs text-gray-400 mb-1 block">Upload Foto</label>
+                <div class="upload-zone" id="gallery-upload-zone" onclick="document.getElementById('gallery-img-input').click()">
+                    <input type="file" id="gallery-img-input" accept="image/*" class="hidden" onchange="previewGalleryImage(this)">
+                    <div id="gallery-img-preview-wrap">
+                        <p class="text-3xl mb-1">📷</p>
+                        <p class="text-xs text-gray-500">Klik atau drag foto ke sini</p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeModal('gallery-modal')" class="flex-1 py-2.5 rounded-xl border border-white/10 text-gray-400 text-sm">Batal</button>
+                <button type="submit" class="flex-1 btn-primary">📤 Upload & Simpan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Confirm Delete Modal -->
+<div class="modal-bg" id="confirm-modal">
+    <div class="modal-card max-w-xs text-center">
+        <div class="text-5xl mb-4">🗑️</div>
+        <h2 class="text-white font-bold text-lg mb-2">Konfirmasi Hapus</h2>
+        <p class="text-gray-400 text-sm mb-6" id="confirm-msg">Apakah kamu yakin ingin menghapus item ini?</p>
+        <div class="flex gap-3">
+            <button onclick="closeModal('confirm-modal')" class="flex-1 py-2.5 rounded-xl border border-white/10 text-gray-400 text-sm">Batal</button>
+            <button id="confirm-action-btn" class="flex-1 py-2.5 rounded-xl bg-red-500/20 border border-red-500/40 text-red-400 text-sm font-semibold">Hapus</button>
+        </div>
+    </div>
+</div>
+
+<script src="dashboard.js"></script>
+</body>
+</html>
