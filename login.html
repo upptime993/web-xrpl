@@ -238,7 +238,7 @@
         arrow.textContent = el.classList.contains('hidden') ? '▼' : '▲';
     }
 
-        fetch('api/auth', {
+        fetch('api/auth.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password })
