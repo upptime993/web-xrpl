@@ -470,7 +470,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             })
             .catch(() => {
-                document.getElementById('modal-gallery').innerHTML = '<div class="col-span-3 text-center py-4 text-gray-500 text-xs text-red-400">Gagal mengambil foto. Pastikan koneksi server nyala.</div>';
+                let miniGalleryHTML = '';
+                const pColors = ['7b2ff7','00d4ff','00ff88','ff00aa','ffae00','6c5ce7'];
+                for(let i=0; i<6; i++) {
+                    const pc = pColors[(s.id + i) % 6];
+                    miniGalleryHTML += `<div class="aspect-square rounded-lg overflow-hidden bg-white/5"><img src="https://placehold.co/200x200/${pc}/fff?text=\\ud83d\\udcf7" alt="Kenangan ${i+1}" class="w-full h-full object-cover opacity-70 hover:opacity-100 hover:scale-110 transition-all duration-300"></div>`;
+                }
+                document.getElementById('modal-gallery').innerHTML = miniGalleryHTML;
             });
 
         lastFocusedElement = document.activeElement;
