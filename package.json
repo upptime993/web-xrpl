@@ -1,0 +1,10 @@
+{
+  "name": "xrpl-web",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node"
+  },
+  "dependencies": {
+    "mongodb": "^6.5.0"
+  }
+}
