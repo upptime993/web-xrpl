@@ -36,9 +36,18 @@ export default async function handler(req, res) {
                 return res.status(400).json({ success: false, message: 'Pesan terlalu panjang (maks 500 karakter)' });
             }
 
+            const userIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || req.connection?.remoteAddress || 'unknown';
+
+            // Cek jumlah pesan dari IP ini
+            const ipCount = await collection.countDocuments({ ip: userIp });
+            if (ipCount >= 2) {
+                return res.status(429).json({ success: false, message: 'Batas maksimal 2 pesan per perangkat telah tercapai. Terimakasih partisipasinya!' });
+            }
+
             const newMsg = {
                 name: name.substring(0, 80).trim(),
                 text: text.substring(0, 500).trim(),
+                ip: userIp,
                 created_at: new Date()
             };
 
