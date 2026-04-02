@@ -134,11 +134,23 @@ function switchTab(tabId) {
     const activeLink = document.querySelector(`[data-tab="${tabId}"]`);
     if (activeLink) activeLink.classList.add('active');
     
-    const titles = { overview: 'Overview', students: 'Kelola Murid', struktur: 'Struktur Organisasi', projects: 'Kelola Projek', gallery: 'Kelola Gallery', guestbook: 'Guestbook', settings: 'Pengaturan', 'my-profile': 'Profil Saya', 'my-snapshots': 'My Snapshots' };
+    const titles = {
+        overview: 'Overview',
+        students: 'Kelola Murid',
+        accounts: 'Akun Murid',
+        struktur: 'Struktur Kelas',
+        projects: 'Kelola Projek',
+        gallery: 'Kelola Gallery',
+        guestbook: 'Pesan Singkat',
+        settings: 'Pengaturan',
+        'my-profile': 'Profil Saya',
+        'my-snapshots': 'My Snapshots'
+    };
     document.getElementById('page-title').textContent = titles[tabId] || tabId;
     
     const loaders = { 
-        students: loadStudents, 
+        students: loadStudents,
+        accounts: loadAccounts,
         struktur: loadStruktur, 
         projects: loadProjects, 
         gallery: loadGallery, 
@@ -199,35 +211,44 @@ function getImgSrc(s, type = 'student') {
 
 // ── OVERVIEW ──────────────────────────────────────────────────
 function updateOverview() {
-    const students = getData('students_db', DEFAULT_STUDENTS);
-    const projects = getData('projects_db', DEFAULT_PROJECTS);
-    const gallery  = getData('gallery_db', DEFAULT_GALLERY);
-    const guestbook = JSON.parse(localStorage.getItem('xrpl_guestbook') || '[]');
+    // Fetch semua data dari MongoDB API (real-time)
+    Promise.all([
+        fetch('api/students').then(r=>r.json()).catch(()=>({success:false,data:[]})),
+        fetch('api/gallery').then(r=>r.json()).catch(()=>({success:false,data:[]})),
+        fetch('api/guestbook').then(r=>r.json()).catch(()=>({success:false,data:[]})),
+        fetch('api/projects').then(r=>r.json()).catch(()=>({success:false,data:[]})),
+    ]).then(([students, gallery, guestbook, projects]) => {
+        const sc = students.success ? students.data.length : getData('students_db', DEFAULT_STUDENTS).length;
+        const gc = gallery.success ? gallery.data.length : getData('gallery_db', DEFAULT_GALLERY).length;
+        const pc = projects.success ? projects.data.length : getData('projects_db', DEFAULT_PROJECTS).length;
+        const msgList = guestbook.success ? guestbook.data : [];
+        const msgCount = msgList.length;
 
-    document.getElementById('ov-students').textContent = students.length;
-    document.getElementById('ov-projects').textContent = projects.length;
-    document.getElementById('ov-gallery').textContent = gallery.length;
-    document.getElementById('ov-guestbook').textContent = guestbook.length;
-    document.getElementById('student-count-badge').textContent = students.length;
-    document.getElementById('gb-count-badge').textContent = guestbook.length;
-    document.getElementById('info-students').textContent = students.length;
-    document.getElementById('info-projects').textContent = projects.length;
+        document.getElementById('ov-students').textContent = sc;
+        document.getElementById('ov-projects').textContent = pc;
+        document.getElementById('ov-gallery').textContent = gc;
+        document.getElementById('ov-guestbook').textContent = msgCount;
+        document.getElementById('student-count-badge').textContent = sc;
+        document.getElementById('gb-count-badge').textContent = msgCount;
+        document.getElementById('info-students').textContent = sc;
+        document.getElementById('info-projects').textContent = pc;
 
-    const recentEl = document.getElementById('ov-recent-messages');
-    const recent = guestbook.slice().reverse().slice(0, 4);
-    if (recent.length === 0) {
-        recentEl.innerHTML = '<p class="text-gray-500 text-sm italic text-center py-6">Belum ada pesan</p>';
-    } else {
-        recentEl.innerHTML = recent.map(m => `
-            <div class="flex gap-3 items-start border border-white/5 rounded-xl p-3">
-                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyber-blue/30 to-electric-purple/30 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">${m.name[0].toUpperCase()}</div>
-                <div class="min-w-0">
-                    <div class="flex items-baseline gap-2"><span class="text-white text-sm font-semibold">${escHtml(m.name)}</span><span class="text-gray-500 text-xs">${m.date}</span></div>
-                    <p class="text-gray-400 text-xs mt-0.5 truncate">${escHtml(m.text)}</p>
+        const recentEl = document.getElementById('ov-recent-messages');
+        const recent = msgList.slice(0, 4);
+        if (recent.length === 0) {
+            recentEl.innerHTML = '<p class="text-gray-500 text-sm italic text-center py-6">Belum ada pesan</p>';
+        } else {
+            recentEl.innerHTML = recent.map(m => `
+                <div class="flex gap-3 items-start border border-white/5 rounded-xl p-3">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyber-blue/30 to-electric-purple/30 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">${(m.name||'?')[0].toUpperCase()}</div>
+                    <div class="min-w-0">
+                        <div class="flex items-baseline gap-2"><span class="text-white text-sm font-semibold">${escHtml(m.name)}</span><span class="text-gray-500 text-xs">${m.date}</span></div>
+                        <p class="text-gray-400 text-xs mt-0.5 truncate">${escHtml(m.text)}</p>
+                    </div>
                 </div>
-            </div>
-        `).join('');
-    }
+            `).join('');
+        }
+    });
 }
 
 // ── STUDENTS (pakai MongoDB API, bukan localStorage) ───────────
@@ -458,30 +479,61 @@ function deleteStudent(id) {
     });
 }
 
-// ── STRUKTUR ──────────────────────────────────────────────────
+// ── STRUKTUR KELAS (MongoDB API) ────────────────────────────────
 let currentStrukturColor = '00d4ff';
+let _strukturCache = [];
 
 function loadStruktur() {
-    const data = getData('struktur_db', DEFAULT_STRUKTUR);
-    const levelLabels = ['Wali Kelas', 'Ketua / Wakil', 'Staff'];
-    const levelColors = ['from-cyber-blue/20 to-cyber-blue/5 border-cyber-blue/20', 'from-electric-purple/20 to-electric-purple/5 border-electric-purple/20', 'from-neon-green/20 to-neon-green/5 border-neon-green/20'];
     const grid = document.getElementById('struktur-grid');
-    grid.innerHTML = data.map(s => `
-        <div class="glass rounded-2xl p-5 bg-gradient-to-br ${levelColors[s.level] || levelColors[2]} relative group">
+    grid.innerHTML = '<p class="col-span-full text-center text-gray-500 py-8">Memuat data...</p>';
+
+    fetch('api/struktur')
+        .then(r => r.json())
+        .then(res => {
+            if (!res.success) throw new Error(res.message);
+            _strukturCache = res.data;
+            renderStrukturGrid(_strukturCache);
+        })
+        .catch(() => {
+            // Fallback localStorage
+            _strukturCache = getData('struktur_db', DEFAULT_STRUKTUR);
+            renderStrukturGrid(_strukturCache);
+        });
+}
+
+function renderStrukturGrid(data) {
+    const grid = document.getElementById('struktur-grid');
+    const levelLabels = { 0: 'Wali Kelas', 0.5: 'Guru Produktif', 1: 'Ketua / Wakil', 2: 'Staff' };
+    const levelGrad = {
+        0: 'from-cyber-blue/20 to-cyber-blue/5 border-cyber-blue/20',
+        0.5: 'from-yellow-400/20 to-yellow-400/5 border-yellow-400/20',
+        1: 'from-electric-purple/20 to-electric-purple/5 border-electric-purple/20',
+        2: 'from-neon-green/20 to-neon-green/5 border-neon-green/20',
+        3: 'from-white/10 to-white/5 border-white/10'
+    };
+    if (!data || data.length === 0) {
+        grid.innerHTML = '<p class="col-span-full text-center text-gray-500 py-8">Belum ada jabatan. Klik "Tambah Jabatan".</p>';
+        return;
+    }
+    grid.innerHTML = data.map(s => {
+        const gradClass = levelGrad[parseFloat(s.level)] || levelGrad[2];
+        const idParam = s._id ? `'${s._id.toString()}'` : s.id;
+        return `
+        <div class="glass rounded-2xl p-5 bg-gradient-to-br ${gradClass} relative group">
             <div class="flex items-center gap-3 mb-3">
                 ${getAvatarHtml(s, 48)}
                 <div>
                     <p class="text-white font-semibold">${escHtml(s.name)}</p>
                     <p class="text-xs font-medium" style="color:#${s.color}">${escHtml(s.jabatan)}</p>
-                    <span class="text-[10px] text-gray-500">${levelLabels[s.level] || 'Staff'}</span>
+                    <span class="text-[10px] text-gray-500">${levelLabels[parseFloat(s.level)] || 'Staff'}</span>
                 </div>
             </div>
             <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button class="btn-edit flex-1 text-xs py-1.5" onclick="editStruktur(${s.id})">✏️ Edit</button>
-                <button class="btn-danger text-xs py-1.5 px-3" onclick="deleteStruktur(${s.id})">🗑️</button>
+                <button class="btn-edit flex-1 text-xs py-1.5" onclick="editStruktur(${idParam})">✏️ Edit</button>
+                <button class="btn-danger text-xs py-1.5 px-3" onclick="deleteStruktur(${idParam})">🗑️</button>
             </div>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 }
 
 function openStrukturModal(id = null) {
@@ -491,9 +543,9 @@ function openStrukturModal(id = null) {
     currentStrukturColor = '00d4ff';
     setStrukturColor('00d4ff', document.querySelector('.str-color-pick[data-color="00d4ff"]'));
     if (id) {
-        const s = getData('struktur_db', DEFAULT_STRUKTUR).find(x => x.id === id);
+        const s = _strukturCache.find(x => (x._id && x._id.toString() === String(id)) || x.id === id);
         if (!s) return;
-        document.getElementById('struktur-id').value = s.id;
+        document.getElementById('struktur-id').value = s._id ? s._id.toString() : (s.id || '');
         document.getElementById('struktur-name').value = s.name;
         document.getElementById('struktur-jabatan').value = s.jabatan;
         document.getElementById('struktur-level').value = s.level;
@@ -503,7 +555,6 @@ function openStrukturModal(id = null) {
 }
 
 function editStruktur(id) { openStrukturModal(id); }
-
 function setStrukturColor(color, el) {
     currentStrukturColor = color;
     document.getElementById('struktur-color').value = color;
@@ -513,49 +564,102 @@ function setStrukturColor(color, el) {
 
 document.getElementById('struktur-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    const data_arr = getData('struktur_db', DEFAULT_STRUKTUR);
-    const id = parseInt(document.getElementById('struktur-id').value);
+    const mongoId = document.getElementById('struktur-id').value.trim();
     const data = {
         name: document.getElementById('struktur-name').value.trim(),
         jabatan: document.getElementById('struktur-jabatan').value.trim(),
-        level: parseInt(document.getElementById('struktur-level').value),
+        level: parseFloat(document.getElementById('struktur-level').value),
         color: currentStrukturColor,
         photo: null
     };
     if (!data.name || !data.jabatan) return showToast('Nama dan jabatan wajib diisi!', 'error');
-    if (id) {
-        const idx = data_arr.findIndex(s => s.id === id);
-        if (idx > -1) data_arr[idx] = { ...data_arr[idx], ...data };
-        showToast('Jabatan berhasil diperbarui!');
-    } else {
-        data.id = nextId(data_arr);
-        data_arr.push(data);
-        showToast('Jabatan berhasil ditambahkan!');
+
+    // Validasi Guru Produktif maks 5
+    if (data.level === 0.5 && !mongoId) {
+        const gpCount = _strukturCache.filter(s => parseFloat(s.level) === 0.5).length;
+        if (gpCount >= 5) return showToast('Guru Produktif sudah mencapai maksimum (5)!', 'error');
     }
-    saveData('struktur_db', data_arr);
-    closeModal('struktur-modal');
-    loadStruktur();
+
+    const btn = this.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = true;
+
+    if (mongoId) {
+        fetch(`api/struktur?id=${mongoId}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (btn) btn.disabled = false;
+            if (res.success) { showToast('Jabatan berhasil diperbarui!'); closeModal('struktur-modal'); loadStruktur(); }
+            else showToast(res.message || 'Gagal update.', 'error');
+        })
+        .catch(() => { if (btn) btn.disabled = false; showToast('Koneksi gagal.', 'error'); });
+    } else {
+        fetch('api/struktur', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (btn) btn.disabled = false;
+            if (res.success) { showToast('Jabatan berhasil ditambahkan!'); closeModal('struktur-modal'); loadStruktur(); }
+            else showToast(res.message || 'Gagal tambah.', 'error');
+        })
+        .catch(() => { if (btn) btn.disabled = false; showToast('Koneksi gagal.', 'error'); });
+    }
 });
 
 function deleteStruktur(id) {
-    const s = getData('struktur_db', DEFAULT_STRUKTUR).find(x => x.id === id);
-    confirmDelete(`Hapus jabatan "${s?.jabatan}" (${s?.name})?`, () => {
-        saveData('struktur_db', getData('struktur_db', DEFAULT_STRUKTUR).filter(x => x.id !== id));
-        loadStruktur();
-        showToast('Jabatan berhasil dihapus.');
+    const s = _strukturCache.find(x => (x._id && x._id.toString() === String(id)) || x.id === id);
+    confirmDelete(`Hapus "${s?.jabatan}" dari struktur?`, () => {
+        fetch(`api/struktur?id=${id}`, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) { showToast('Jabatan berhasil dihapus.'); loadStruktur(); }
+            else showToast(res.message || 'Gagal hapus.', 'error');
+        })
+        .catch(() => showToast('Koneksi gagal.', 'error'));
     });
 }
 
-// ── PROJECTS ──────────────────────────────────────────────────
+// ── PROJECTS (MongoDB API) ──────────────────────────────────────
 let currentProjectImageData = null;
+let _projectsCache = [];
 
 function loadProjects() {
-    const data = getData('projects_db', DEFAULT_PROJECTS);
     const grid = document.getElementById('projects-grid');
-    grid.innerHTML = data.map(p => `
-        <div class="glass rounded-2xl overflow-hidden group flex flex-col" style="border-color: #${p.color}30">
+    grid.innerHTML = '<p class="col-span-full text-center text-gray-500 py-8">Memuat projek...</p>';
+
+    fetch('api/projects')
+        .then(r => r.json())
+        .then(res => {
+            if (!res.success) throw new Error(res.message);
+            _projectsCache = res.data;
+            renderProjectsGrid(_projectsCache);
+        })
+        .catch(() => {
+            // Fallback ke localStorage
+            _projectsCache = getData('projects_db', DEFAULT_PROJECTS);
+            renderProjectsGrid(_projectsCache);
+        });
+}
+
+function renderProjectsGrid(data) {
+    const grid = document.getElementById('projects-grid');
+    if (!data || data.length === 0) {
+        grid.innerHTML = '<p class="col-span-full text-center text-gray-500 py-8">Belum ada projek. Tambahkan sekarang!</p>';
+        return;
+    }
+    grid.innerHTML = data.map(p => {
+        const mongoId = p._id ? p._id.toString() : null;
+        const idParam = mongoId ? `'${mongoId}'` : p.id;
+        return `
+        <div class="glass rounded-2xl overflow-hidden group flex flex-col" style="border-color: #${p.color || '00d4ff'}30">
             <div class="aspect-video overflow-hidden relative bg-white/5">
-                <img src="${p.image || `https://placehold.co/600x338/${p.color}/fff?text=${encodeURIComponent(p.title)}`}"
+                <img src="${p.image || `https://placehold.co/600x338/${p.color || '00d4ff'}/fff?text=${encodeURIComponent(p.title)}`}"
                     alt="${escHtml(p.title)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 lazy-img">
             </div>
             <div class="p-5 flex-1 flex flex-col">
@@ -565,12 +669,12 @@ function loadProjects() {
                     ${(p.tags||[]).map(t => `<span class="text-[10px] px-2 py-0.5 rounded-full border" style="color:#${p.color};border-color:#${p.color}40;background:#${p.color}10">${escHtml(t)}</span>`).join('')}
                 </div>
                 <div class="flex gap-2">
-                    <button class="btn-edit flex-1 text-xs py-1.5" onclick="editProject(${p.id})">✏️ Edit</button>
-                    <button class="btn-danger text-xs py-1.5 px-3" onclick="deleteProject(${p.id})">🗑️</button>
+                    <button class="btn-edit flex-1 text-xs py-1.5" onclick="editProject(${idParam})">✏️ Edit</button>
+                    <button class="btn-danger text-xs py-1.5 px-3" onclick="deleteProject(${idParam})">🗑️</button>
                 </div>
             </div>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 }
 
 function openProjectModal(id = null) {
@@ -580,9 +684,9 @@ function openProjectModal(id = null) {
     currentProjectImageData = null;
     document.getElementById('project-img-preview-wrap').innerHTML = '<p class="text-2xl mb-1">🖼️</p><p class="text-xs text-gray-500">Klik untuk upload gambar</p>';
     if (id) {
-        const p = getData('projects_db', DEFAULT_PROJECTS).find(x => x.id === id);
+        const p = _projectsCache.find(x => (x._id && x._id.toString() === String(id)) || x.id === id);
         if (!p) return;
-        document.getElementById('project-id').value = p.id;
+        document.getElementById('project-id').value = p._id ? p._id.toString() : (p.id || '');
         document.getElementById('project-title').value = p.title;
         document.getElementById('project-desc').value = p.description || '';
         document.getElementById('project-tags').value = (p.tags || []).join(', ');
@@ -609,62 +713,129 @@ function previewProjectImage(input) {
 
 document.getElementById('project-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    const data_arr = getData('projects_db', DEFAULT_PROJECTS);
-    const id = parseInt(document.getElementById('project-id').value);
+    const mongoId = document.getElementById('project-id').value.trim();
     const tags = document.getElementById('project-tags').value.split(',').map(t => t.trim()).filter(Boolean);
     const colors = ['00d4ff','7b2ff7','00ff88','ff00aa','ffae00'];
     const data = {
         title: document.getElementById('project-title').value.trim(),
         description: document.getElementById('project-desc').value.trim(),
-        tags, link: document.getElementById('project-link').value.trim(),
+        tags,
+        link: document.getElementById('project-link').value.trim(),
         image: currentProjectImageData,
-        color: colors[data_arr.length % colors.length]
+        color: colors[_projectsCache.length % colors.length]
     };
     if (!data.title) return showToast('Judul projek wajib diisi!', 'error');
-    if (id) {
-        const idx = data_arr.findIndex(p => p.id === id);
-        if (idx > -1) data_arr[idx] = { ...data_arr[idx], ...data };
-        showToast('Projek berhasil diperbarui!');
+
+    const btn = this.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = true;
+
+    if (mongoId) {
+        // UPDATE
+        fetch(`api/projects?id=${mongoId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (btn) btn.disabled = false;
+            if (res.success) {
+                showToast('Projek berhasil diperbarui!');
+                closeModal('project-modal');
+                loadProjects();
+                updateOverview();
+            } else {
+                showToast(res.message || 'Gagal update projek.', 'error');
+            }
+        })
+        .catch(() => { if (btn) btn.disabled = false; showToast('Koneksi gagal.', 'error'); });
     } else {
-        data.id = nextId(data_arr);
-        data_arr.push(data);
-        showToast('Projek berhasil ditambahkan!');
+        // TAMBAH BARU
+        fetch('api/projects', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (btn) btn.disabled = false;
+            if (res.success) {
+                showToast('Projek berhasil ditambahkan!');
+                closeModal('project-modal');
+                loadProjects();
+                updateOverview();
+            } else {
+                showToast(res.message || 'Gagal tambah projek.', 'error');
+            }
+        })
+        .catch(() => { if (btn) btn.disabled = false; showToast('Koneksi gagal.', 'error'); });
     }
-    saveData('projects_db', data_arr);
-    closeModal('project-modal');
-    loadProjects();
 });
 
 function deleteProject(id) {
-    const p = getData('projects_db', DEFAULT_PROJECTS).find(x => x.id === id);
+    const p = _projectsCache.find(x => (x._id && x._id.toString() === String(id)) || x.id === id);
     confirmDelete(`Hapus projek "${p?.title}"?`, () => {
-        saveData('projects_db', getData('projects_db', DEFAULT_PROJECTS).filter(x => x.id !== id));
-        loadProjects();
-        showToast('Projek berhasil dihapus.');
+        fetch(`api/projects?id=${id}`, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                showToast('Projek berhasil dihapus.');
+                loadProjects();
+                updateOverview();
+            } else {
+                showToast(res.message || 'Gagal hapus projek.', 'error');
+            }
+        })
+        .catch(() => showToast('Koneksi gagal.', 'error'));
     });
 }
 
-// ── GALLERY ───────────────────────────────────────────────────
+// ── GALLERY (MongoDB API) ──────────────────────────────────────
 let currentGalleryImageData = null;
+let _galleryCache = [];
 
 function loadGallery() {
-    const data = getData('gallery_db', DEFAULT_GALLERY);
-    const catColors = { belajar: '00d4ff', keseruan: '00ff88', event: '7b2ff7', candid: 'ffae00' };
     const grid = document.getElementById('gallery-grid-admin');
-    grid.innerHTML = data.map(g => `
+    grid.innerHTML = '<p class="col-span-full text-center text-gray-500 py-8">Memuat gallery...</p>';
+
+    fetch('api/gallery')
+        .then(r => r.json())
+        .then(res => {
+            if (!res.success) throw new Error(res.message);
+            _galleryCache = res.data;
+            renderGalleryAdmin(_galleryCache);
+        })
+        .catch(() => {
+            _galleryCache = getData('gallery_db', DEFAULT_GALLERY);
+            renderGalleryAdmin(_galleryCache);
+        });
+}
+
+function renderGalleryAdmin(data) {
+    const grid = document.getElementById('gallery-grid-admin');
+    const catColors = { belajar: '00d4ff', keseruan: '00ff88', event: '7b2ff7', candid: 'ffae00' };
+    if (!data || data.length === 0) {
+        grid.innerHTML = '<p class="col-span-full text-center text-gray-500 py-8">Belum ada foto. Upload sekarang!</p>';
+        return;
+    }
+    grid.innerHTML = data.map(g => {
+        const mongoId = g._id ? g._id.toString() : null;
+        const idParam = mongoId ? `'${mongoId}'` : g.id;
+        const cat = g.category || 'event';
+        return `
         <div class="group relative aspect-square rounded-xl overflow-hidden border border-white/5">
-            <img src="${g.image || `https://placehold.co/400x400/${g.color}/fff?text=${g.category.toUpperCase()}`}"
+            <img src="${g.image || `https://placehold.co/400x400/${g.color || '7b2ff7'}/fff?text=${cat.toUpperCase()}`}"
                  class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="${escHtml(g.title)}" loading="lazy">
             <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
-                <span class="text-[10px] font-bold uppercase mb-1" style="color:#${catColors[g.category]||'fff'}">${g.category}</span>
+                <span class="text-[10px] font-bold uppercase mb-1" style="color:#${catColors[cat]||'fff'}">${cat}</span>
                 <p class="text-white text-xs font-medium leading-tight mb-2 line-clamp-2">${escHtml(g.title)}</p>
                 <div class="flex gap-1">
-                    <button class="flex-1 btn-edit text-[10px] py-1" onclick="editGallery(${g.id})">✏️ Edit</button>
-                    <button class="btn-danger text-[10px] py-1 px-2" onclick="deleteGallery(${g.id})">🗑️</button>
+                    <button class="flex-1 btn-edit text-[10px] py-1" onclick="editGallery(${idParam})">✏️ Edit</button>
+                    <button class="btn-danger text-[10px] py-1 px-2" onclick="deleteGallery(${idParam})">🗑️</button>
                 </div>
             </div>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 }
 
 function openGalleryModal(id = null) {
@@ -673,9 +844,9 @@ function openGalleryModal(id = null) {
     currentGalleryImageData = null;
     document.getElementById('gallery-img-preview-wrap').innerHTML = '<p class="text-3xl mb-1">📷</p><p class="text-xs text-gray-500">Klik atau drag foto ke sini</p>';
     if (id) {
-        const g = getData('gallery_db', DEFAULT_GALLERY).find(x => x.id === id);
+        const g = _galleryCache.find(x => (x._id && x._id.toString() === String(id)) || x.id === id);
         if (g) {
-            document.getElementById('gallery-id').value = g.id;
+            document.getElementById('gallery-id').value = g._id ? g._id.toString() : (g.id || '');
             document.getElementById('gallery-title').value = g.title;
             document.getElementById('gallery-category').value = g.category;
             if (g.image) {
@@ -701,8 +872,7 @@ function previewGalleryImage(input) {
 
 document.getElementById('gallery-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    const data_arr = getData('gallery_db', DEFAULT_GALLERY);
-    const id = parseInt(document.getElementById('gallery-id').value);
+    const mongoId = document.getElementById('gallery-id').value.trim();
     const cat = document.getElementById('gallery-category').value;
     const catColors = { belajar: '00d4ff', keseruan: '00ff88', event: '7b2ff7', candid: 'ffae00' };
     const data = {
@@ -710,70 +880,186 @@ document.getElementById('gallery-form').addEventListener('submit', function(e) {
         category: cat,
         color: catColors[cat] || '7b2ff7',
         image: currentGalleryImageData,
-        span: 'col-span-1'
     };
     if (!data.title) return showToast('Judul foto wajib diisi!', 'error');
-    if (id) {
-        const idx = data_arr.findIndex(g => g.id === id);
-        if (idx > -1) data_arr[idx] = { ...data_arr[idx], ...data };
-        showToast('Foto berhasil diperbarui!');
+
+    const btn = this.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = true;
+
+    if (mongoId) {
+        fetch(`api/gallery?id=${mongoId}`, {
+            method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (btn) btn.disabled = false;
+            if (res.success) { showToast('Foto berhasil diperbarui!'); closeModal('gallery-modal'); loadGallery(); }
+            else showToast(res.message || 'Gagal update.', 'error');
+        })
+        .catch(() => { if (btn) btn.disabled = false; showToast('Koneksi gagal.', 'error'); });
     } else {
-        data.id = nextId(data_arr);
-        data_arr.push(data);
-        showToast('Foto berhasil ditambahkan!');
+        fetch('api/gallery', {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (btn) btn.disabled = false;
+            if (res.success) { showToast('Foto berhasil ditambahkan!'); closeModal('gallery-modal'); loadGallery(); }
+            else showToast(res.message || 'Gagal tambah.', 'error');
+        })
+        .catch(() => { if (btn) btn.disabled = false; showToast('Koneksi gagal.', 'error'); });
     }
-    saveData('gallery_db', data_arr);
-    closeModal('gallery-modal');
-    loadGallery();
 });
 
 function deleteGallery(id) {
     confirmDelete('Hapus foto ini dari gallery?', () => {
-        saveData('gallery_db', getData('gallery_db', DEFAULT_GALLERY).filter(x => x.id !== id));
-        loadGallery();
-        showToast('Foto berhasil dihapus.');
+        fetch(`api/gallery?id=${id}`, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) { loadGallery(); showToast('Foto berhasil dihapus.'); }
+            else showToast(res.message || 'Gagal hapus.', 'error');
+        })
+        .catch(() => showToast('Koneksi gagal.', 'error'));
     });
 }
 
-// ── GUESTBOOK ─────────────────────────────────────────────────
+// ── PESAN SINGKAT / GUESTBOOK (MongoDB API) ───────────────────
 function loadGuestbook() {
-    const messages = JSON.parse(localStorage.getItem('xrpl_guestbook') || '[]');
     const el = document.getElementById('guestbook-admin');
-    if (messages.length === 0) {
-        el.innerHTML = '<p class="text-gray-500 text-sm italic text-center py-12">Belum ada pesan di guestbook.</p>';
-        return;
-    }
-    el.innerHTML = messages.slice().reverse().map((m, i) => `
-        <div class="p-4 flex items-start gap-3">
-            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyber-blue/30 to-electric-purple/30 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">${(m.name||'?')[0].toUpperCase()}</div>
-            <div class="flex-1 min-w-0">
-                <div class="flex items-baseline gap-2 flex-wrap">
-                    <span class="text-white text-sm font-semibold">${escHtml(m.name)}</span>
-                    <span class="text-gray-500 text-xs">${m.date}</span>
+    el.innerHTML = '<p class="text-gray-500 text-sm italic text-center py-12">Memuat pesan...</p>';
+
+    fetch('api/guestbook')
+        .then(r => r.json())
+        .then(res => {
+            if (!res.success) throw new Error(res.message);
+            const messages = res.data;
+
+            // Update statistik
+            const today = new Date();
+            const todayStr = today.toDateString();
+            const weekAgo = new Date(today - 7 * 86400000);
+            const todayCount = messages.filter(m => m.created_at && new Date(m.created_at).toDateString() === todayStr).length;
+            const weekCount = messages.filter(m => m.created_at && new Date(m.created_at) >= weekAgo).length;
+
+            document.getElementById('gb-stat-total').textContent = messages.length;
+            document.getElementById('gb-stat-today').textContent = todayCount;
+            document.getElementById('gb-stat-week').textContent = weekCount;
+            document.getElementById('gb-count-badge').textContent = messages.length;
+
+            if (messages.length === 0) {
+                el.innerHTML = '<p class="text-gray-500 text-sm italic text-center py-12">Belum ada pesan singkat.</p>';
+                return;
+            }
+            el.innerHTML = messages.map(m => `
+                <div class="msg-card">
+                    <div class="flex items-start gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyber-blue/30 to-electric-purple/30 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">${(m.name||'?')[0].toUpperCase()}</div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-baseline gap-2 flex-wrap mb-1">
+                                <span class="text-white text-sm font-semibold">${escHtml(m.name)}</span>
+                                <span class="text-gray-500 text-xs">📅 ${m.date || '-'}</span>
+                            </div>
+                            <p class="text-gray-300 text-sm break-words leading-relaxed">${escHtml(m.text)}</p>
+                        </div>
+                        <button onclick="deleteGuestbookMsg('${m.id}')" class="btn-danger text-xs py-1 px-2 flex-shrink-0">🗑️</button>
+                    </div>
                 </div>
-                <p class="text-gray-300 text-sm mt-0.5 break-words">${escHtml(m.text)}</p>
-            </div>
-            <button onclick="deleteGuestbookMsg(${messages.length - 1 - i})" class="btn-danger text-xs py-1 px-2 flex-shrink-0">🗑️</button>
-        </div>
-    `).join('');
+            `).join('');
+        })
+        .catch(err => {
+            el.innerHTML = '<p class="text-red-400 text-sm text-center py-12">Gagal memuat pesan. Cek koneksi database.</p>';
+        });
 }
 
-function deleteGuestbookMsg(idx) {
-    const msgs = JSON.parse(localStorage.getItem('xrpl_guestbook') || '[]');
-    msgs.splice(idx, 1);
-    localStorage.setItem('xrpl_guestbook', JSON.stringify(msgs));
-    loadGuestbook();
-    updateOverview();
-    showToast('Pesan berhasil dihapus.');
+function deleteGuestbookMsg(id) {
+    fetch(`api/guestbook?id=${id}`, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) { loadGuestbook(); showToast('Pesan berhasil dihapus.'); }
+        else showToast(res.message || 'Gagal hapus.', 'error');
+    })
+    .catch(() => showToast('Koneksi gagal.', 'error'));
 }
 
 function clearAllGuestbook() {
-    confirmDelete('Hapus SEMUA pesan guestbook? Tindakan ini tidak bisa dibatalkan!', () => {
-        localStorage.removeItem('xrpl_guestbook');
-        loadGuestbook();
-        updateOverview();
-        showToast('Semua pesan berhasil dihapus.');
+    confirmDelete('Hapus SEMUA pesan singkat? Tidak bisa dibatalkan!', () => {
+        fetch('api/guestbook?all=true', { method: 'DELETE' })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) { loadGuestbook(); showToast('Semua pesan berhasil dihapus.'); }
+            else showToast(res.message || 'Gagal hapus.', 'error');
+        })
+        .catch(() => showToast('Koneksi gagal.', 'error'));
     });
+}
+
+// ── AKUN MURID (Accounts Tab) ─────────────────────────────────
+function loadAccounts() {
+    const el = document.getElementById('accounts-list');
+    el.innerHTML = '<p class="text-gray-500 text-sm italic text-center py-8">Memuat akun murid...</p>';
+
+    fetch('api/students')
+    .then(r => r.json())
+    .then(res => {
+        if (!res.success) throw new Error(res.message);
+        const students = res.data;
+        document.getElementById('accounts-count').textContent = `${students.length} akun`;
+
+        if (students.length === 0) {
+            el.innerHTML = '<p class="text-gray-500 text-sm italic text-center py-8">Belum ada murid yang terdaftar.</p>';
+            return;
+        }
+        el.innerHTML = students.map(s => {
+            const username = s.username || (s.name || '').toLowerCase().replace(/\s+/g, '.').replace(/[^a-z0-9.]/g, '');
+            return `
+            <div class="account-row">
+                <div class="flex items-center gap-3">
+                    ${getAvatarHtml(s, 38)}
+                    <div>
+                        <p class="text-white text-sm font-semibold">${escHtml(s.name || '-')}</p>
+                        <p class="text-gray-500 text-xs font-mono">@${escHtml(username)}</p>
+                    </div>
+                </div>
+                <span class="acc-badge border-neon-green/40 text-neon-green bg-neon-green/10 text-[10px]">Aktif</span>
+                <div class="flex gap-2">
+                    <button class="btn-edit text-xs py-1 px-3" onclick="quickResetPassword('${escHtml(username)}')">🔑 Reset</button>
+                </div>
+            </div>`;
+        }).join('');
+    })
+    .catch(() => {
+        el.innerHTML = '<p class="text-red-400 text-sm text-center py-8">Gagal memuat akun. Cek koneksi database.</p>';
+    });
+}
+
+function quickResetPassword(username) {
+    document.getElementById('reset-username').value = username;
+    document.getElementById('reset-new-password').focus();
+    showToast(`Username @${username} siap di-reset. Masukkan password baru!`, 'info');
+}
+
+function resetStudentPassword() {
+    const username = document.getElementById('reset-username').value.trim();
+    const newPw = document.getElementById('reset-new-password').value;
+    if (!username) return showToast('Masukkan username murid!', 'error');
+    if (!newPw || newPw.length < 6) return showToast('Password minimal 6 karakter!', 'error');
+
+    fetch('api/auth', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, newPassword: newPw })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            document.getElementById('reset-username').value = '';
+            document.getElementById('reset-new-password').value = '';
+            showToast(`✅ Password @${username} berhasil direset!`);
+        } else {
+            showToast(res.message || 'Gagal reset password.', 'error');
+        }
+    })
+    .catch(() => showToast('Koneksi gagal.', 'error'));
 }
 
 // ── SETTINGS ──────────────────────────────────────────────────

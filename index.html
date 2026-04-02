@@ -97,12 +97,41 @@
         .reveal { opacity: 0; transform: translateY(30px); transition: all 0.8s cubic-bezier(0.5, 0, 0, 1); will-change: opacity, transform; }
         .reveal.active { opacity: 1; transform: translateY(0); }
         .focus-outline-none:focus { outline: none; }
-        .org-connector-v { width: 2px; height: 24px; background: linear-gradient(to bottom, #00d4ff, #7b2ff7); margin: 0 auto; }
-        .org-connector-h { border-top: 2px solid #7b2ff7; width: 100%; position: absolute; top: 0; left: 0; }
         .footer-gradient-border { position: relative; }
         .footer-gradient-border::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, #00d4ff, #7b2ff7, transparent); }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Animated Struktur Kelas Connector Lines */
+        @keyframes lineFlowV {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 0% 200%; }
+        }
+        @keyframes lineFlowH {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 200% 0%; }
+        }
+        @keyframes lineGlow {
+            0%, 100% { opacity: 0.6; filter: drop-shadow(0 0 2px rgba(0,212,255,0.3)); }
+            50% { opacity: 1; filter: drop-shadow(0 0 6px rgba(123,47,247,0.6)); }
+        }
+        .struktur-line-v {
+            background: linear-gradient(180deg, #00d4ff, #7b2ff7, #00d4ff);
+            background-size: 100% 200%;
+            animation: lineFlowV 3s linear infinite, lineGlow 2.5s ease-in-out infinite;
+            border-radius: 1px;
+        }
+        .struktur-line-h {
+            background: linear-gradient(90deg, #00d4ff, #7b2ff7, #00d4ff);
+            background-size: 200% 100%;
+            animation: lineFlowH 3s linear infinite, lineGlow 2.5s ease-in-out infinite;
+            border-radius: 1px;
+        }
+
+        /* Pesan Singkat msg-card */
+        .ps-msg-card { background: linear-gradient(135deg, rgba(0,212,255,0.04), rgba(123,47,247,0.04)); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; padding: 16px; transition: all 0.3s; position: relative; overflow: hidden; }
+        .ps-msg-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: linear-gradient(to bottom, #00d4ff, #7b2ff7); border-radius: 3px 0 0 3px; }
+        .ps-msg-card:hover { border-color: rgba(0,212,255,0.2); transform: translateX(4px); }
     </style>
 </head>
 <body class="antialiased selection:bg-cyber-blue selection:text-dark-bg">
@@ -133,7 +162,7 @@
                         <a href="#struktur" class="nav-link text-text-secondary hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-all relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-gradient-to-r after:from-cyber-blue after:to-electric-purple hover:after:w-full after:transition-all after:duration-300">Struktur</a>
                         <a href="#murid" class="nav-link text-text-secondary hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-all relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-gradient-to-r after:from-cyber-blue after:to-electric-purple hover:after:w-full after:transition-all after:duration-300">Murid</a>
                         <a href="#projek" class="nav-link text-text-secondary hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-all relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-gradient-to-r after:from-cyber-blue after:to-electric-purple hover:after:w-full after:transition-all after:duration-300">Projek</a>
-                        <a href="#guestbook" class="nav-link text-text-secondary hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-all relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-gradient-to-r after:from-cyber-blue after:to-electric-purple hover:after:w-full after:transition-all after:duration-300">Guestbook</a>
+                        <a href="#guestbook" class="nav-link text-text-secondary hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-all relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-gradient-to-r after:from-cyber-blue after:to-electric-purple hover:after:w-full after:transition-all after:duration-300">Pesan Singkat</a>
                     </div>
                     <!-- Login/Dashboard Button -->
                     <div id="nav-auth-btn" class="ml-4"></div>
@@ -154,7 +183,7 @@
             <a href="#struktur" class="mobile-nav-link text-2xl font-heading text-text-secondary hover:text-white transition-colors">Struktur Kelas</a>
             <a href="#murid" class="mobile-nav-link text-2xl font-heading text-text-secondary hover:text-white transition-colors">Murid</a>
             <a href="#projek" class="mobile-nav-link text-2xl font-heading text-text-secondary hover:text-white transition-colors">Projek</a>
-            <a href="#guestbook" class="mobile-nav-link text-2xl font-heading text-text-secondary hover:text-white transition-colors">Guestbook</a>
+            <a href="#guestbook" class="mobile-nav-link text-2xl font-heading text-text-secondary hover:text-white transition-colors">Pesan Singkat</a>
             <div id="mobile-auth-btn"></div>
         </div>
     </nav>
@@ -274,7 +303,7 @@
                         <div class="text-sm text-text-secondary uppercase tracking-wider font-semibold">Keluarga</div>
                     </div>
                     <div>
-                        <div class="text-4xl md:text-5xl font-heading font-bold text-white mb-2">∞</div>
+                        <div class="text-4xl md:text-5xl font-heading font-bold text-transparent bg-clip-text bg-gradient-to-br from-yellow-400 to-white mb-2 counter" data-target="12">0</div>
                         <div class="text-sm text-text-secondary uppercase tracking-wider font-semibold">Kenangan</div>
                     </div>
                 </div>
@@ -284,53 +313,53 @@
         <section id="struktur" class="py-24 px-4 bg-dark-alt">
             <div class="max-w-6xl mx-auto">
                 <div class="text-center mb-16 reveal">
-                    <h2 class="text-4xl font-heading font-bold text-white mb-4">Struktur Organisasi</h2>
+                    <h2 class="text-4xl font-heading font-bold text-white mb-4">Struktur Kelas</h2>
                     <div class="w-24 h-1 bg-gradient-to-r from-electric-purple to-cyber-blue mx-auto rounded-full"></div>
                 </div>
 
-                <div class="flex flex-col items-center mt-12 w-full px-2">
-                    
+                <div id="struktur-tree" class="flex flex-col items-center mt-12 w-full px-2">
+                    <!-- Konten default (fallback jika MongoDB belum ada data) -->
                     <div class="flex flex-col items-center reveal w-full">
                         <div class="glass w-56 md:w-64 rounded-2xl p-5 text-center border-t border-t-cyber-blue relative z-10 hover:scale-105 transition-transform duration-300 hover:shadow-[0_0_20px_rgba(0,212,255,0.2)]">
                             <img src="https://ui-avatars.com/api/?name=Bapak+Guru&background=00d4ff&color=fff&size=150" alt="Wali Kelas" class="w-16 h-16 md:w-20 md:h-20 rounded-full mx-auto mb-3 object-cover border-2 border-cyber-blue" loading="lazy">
                             <h3 class="font-bold text-white text-base md:text-lg">Bpk. Budi Santoso</h3>
                             <p class="text-xs md:text-sm font-medium text-cyber-blue">Wali Kelas</p>
                         </div>
-                        <div class="w-[2px] h-8 md:h-12 bg-gradient-to-b from-cyber-blue to-electric-purple"></div>
+                        <div class="struktur-line-v w-[2px] h-8 md:h-12"></div>
                     </div>
 
                     <div class="relative w-full max-w-2xl reveal delay-100">
-                        <div class="absolute top-0 left-[20%] right-[20%] md:left-1/4 md:right-1/4 h-[2px] bg-electric-purple z-0"></div>
+                        <div class="struktur-line-h absolute top-0 left-[20%] right-[20%] md:left-1/4 md:right-1/4 h-[2px] z-0"></div>
                         
                         <div class="flex justify-center gap-4 md:gap-32 relative z-10 w-full">
                             <div class="relative flex flex-col items-center w-1/2 max-w-[180px] md:w-48">
-                                <div class="absolute -top-8 md:-top-12 w-[2px] h-8 md:h-12 bg-electric-purple"></div>
+                                <div class="struktur-line-v absolute -top-8 md:-top-12 w-[2px] h-8 md:h-12"></div>
                                 <div class="glass w-full rounded-2xl p-3 md:p-4 text-center hover:scale-105 transition-transform duration-300 hover:shadow-[0_0_15px_rgba(123,47,247,0.2)]">
                                     <img src="https://ui-avatars.com/api/?name=Ahmad+Rizky&background=7b2ff7&color=fff&size=150" alt="Ketua Kelas" class="w-12 h-12 md:w-16 md:h-16 rounded-full mx-auto mb-2 object-cover" loading="lazy">
                                     <h3 class="font-semibold text-white text-xs md:text-sm">Ahmad Rizky</h3>
                                     <p class="text-[10px] md:text-xs text-electric-purple">Ketua Kelas</p>
                                 </div>
-                                <div class="w-[2px] h-6 md:h-8 bg-gradient-to-b from-electric-purple to-white/20"></div>
+                                <div class="struktur-line-v w-[2px] h-6 md:h-8"></div>
                             </div>
                             
                             <div class="relative flex flex-col items-center w-1/2 max-w-[180px] md:w-48">
-                                <div class="absolute -top-8 md:-top-12 w-[2px] h-8 md:h-12 bg-electric-purple"></div>
+                                <div class="struktur-line-v absolute -top-8 md:-top-12 w-[2px] h-8 md:h-12"></div>
                                 <div class="glass w-full rounded-2xl p-3 md:p-4 text-center hover:scale-105 transition-transform duration-300 hover:shadow-[0_0_15px_rgba(123,47,247,0.2)]">
                                     <img src="https://ui-avatars.com/api/?name=Dina+Puspita&background=7b2ff7&color=fff&size=150" alt="Wakil Ketua" class="w-12 h-12 md:w-16 md:h-16 rounded-full mx-auto mb-2 object-cover" loading="lazy">
                                     <h3 class="font-semibold text-white text-xs md:text-sm">Dina Puspita</h3>
                                     <p class="text-[10px] md:text-xs text-electric-purple">Wakil Ketua</p>
                                 </div>
-                                <div class="w-[2px] h-6 md:h-8 bg-gradient-to-b from-electric-purple to-white/20"></div>
+                                <div class="struktur-line-v w-[2px] h-6 md:h-8"></div>
                             </div>
                         </div>
                     </div>
 
                     <div class="relative w-full max-w-3xl reveal delay-200">
-                        <div class="absolute top-0 left-[10%] right-[10%] h-[2px] bg-white/20 z-0"></div>
+                        <div class="struktur-line-h absolute top-0 left-[10%] right-[10%] h-[2px] z-0"></div>
                         
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 relative z-10 w-full px-2 mt-0">
                             <div class="relative flex flex-col items-center">
-                                <div class="absolute -top-6 md:-top-8 w-[2px] h-6 md:h-8 bg-white/20"></div>
+                                <div class="struktur-line-v absolute -top-6 md:-top-8 w-[2px] h-6 md:h-8"></div>
                                 <div class="glass w-full max-w-[150px] rounded-2xl p-3 text-center hover:scale-105 transition-transform">
                                     <img src="https://ui-avatars.com/api/?name=Siti+Aisyah&background=00ff88&color=000&size=150" alt="Sekretaris 1" class="w-10 h-10 md:w-14 md:h-14 rounded-full mx-auto mb-2" loading="lazy">
                                     <h3 class="font-medium text-white text-[11px] md:text-xs truncate w-full">Siti Aisyah</h3>
@@ -338,7 +367,7 @@
                                 </div>
                             </div>
                             <div class="relative flex flex-col items-center">
-                                <div class="absolute -top-6 md:-top-8 w-[2px] h-6 md:h-8 bg-white/20"></div>
+                                <div class="struktur-line-v absolute -top-6 md:-top-8 w-[2px] h-6 md:h-8"></div>
                                 <div class="glass w-full max-w-[150px] rounded-2xl p-3 text-center hover:scale-105 transition-transform">
                                     <img src="https://ui-avatars.com/api/?name=Bagas+Putra&background=00ff88&color=000&size=150" alt="Sekretaris 2" class="w-10 h-10 md:w-14 md:h-14 rounded-full mx-auto mb-2" loading="lazy">
                                     <h3 class="font-medium text-white text-[11px] md:text-xs truncate w-full">Bagas Putra</h3>
@@ -346,7 +375,7 @@
                                 </div>
                             </div>
                             <div class="relative flex flex-col items-center">
-                                <div class="absolute -top-6 md:-top-8 w-[2px] h-6 md:h-8 bg-white/20"></div>
+                                <div class="struktur-line-v absolute -top-6 md:-top-8 w-[2px] h-6 md:h-8"></div>
                                 <div class="glass w-full max-w-[150px] rounded-2xl p-3 text-center hover:scale-105 transition-transform">
                                     <img src="https://ui-avatars.com/api/?name=Maya+Sari&background=ff00aa&color=fff&size=150" alt="Bendahara 1" class="w-10 h-10 md:w-14 md:h-14 rounded-full mx-auto mb-2" loading="lazy">
                                     <h3 class="font-medium text-white text-[11px] md:text-xs truncate w-full">Maya Sari</h3>
@@ -354,7 +383,7 @@
                                 </div>
                             </div>
                             <div class="relative flex flex-col items-center">
-                                <div class="absolute -top-6 md:-top-8 w-[2px] h-6 md:h-8 bg-white/20"></div>
+                                <div class="struktur-line-v absolute -top-6 md:-top-8 w-[2px] h-6 md:h-8"></div>
                                 <div class="glass w-full max-w-[150px] rounded-2xl p-3 text-center hover:scale-105 transition-transform">
                                     <img src="https://ui-avatars.com/api/?name=Kevin+Julian&background=ff00aa&color=fff&size=150" alt="Bendahara 2" class="w-10 h-10 md:w-14 md:h-14 rounded-full mx-auto mb-2" loading="lazy">
                                     <h3 class="font-medium text-white text-[11px] md:text-xs truncate w-full">Kevin Julian</h3>
@@ -468,28 +497,45 @@
             </div>
         </section>
 
-        <section id="guestbook" class="py-24 px-4 bg-dark-alt relative">
-            <div class="max-w-4xl mx-auto">
-                <div class="text-center mb-10 reveal">
-                    <h2 class="text-4xl font-heading font-bold text-white mb-2">Buku Tamu 📝</h2>
-                    <p class="text-text-secondary">Tinggalkan pesan, kesan, atau salam untuk kelas X RPL!</p>
+        <section id="guestbook" class="py-24 px-4 bg-dark-alt relative overflow-hidden">
+            <!-- Decorative bg elements -->
+            <div class="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-cyber-blue/5 via-transparent to-transparent rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute bottom-0 left-0 w-80 h-80 bg-gradient-to-tr from-electric-purple/5 via-transparent to-transparent rounded-full blur-3xl pointer-events-none"></div>
+            
+            <div class="max-w-5xl mx-auto relative z-10">
+                <div class="text-center mb-12 reveal">
+                    <h2 class="text-4xl font-heading font-bold text-white mb-3">Pesan Singkat 💬</h2>
+                    <p class="text-text-secondary max-w-lg mx-auto">Tinggalkan pesan, kesan, atau salam untuk kelas X RPL! Semua pesan tersimpan langsung ke database.</p>
+                    <div class="w-24 h-1 bg-gradient-to-r from-cyber-blue to-electric-purple mx-auto rounded-full mt-6"></div>
                 </div>
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 reveal">
-                    <div class="glass p-6 rounded-2xl">
-                        <form id="guestbook-form" class="space-y-4">
-                            <div>
-                                <input type="text" id="gb-name" required placeholder="Nama Kamu" class="w-full bg-dark-bg border border-white/10 rounded-lg px-4 py-3 text-white focus:border-cyber-blue focus:outline-none transition-colors">
-                            </div>
-                            <div>
-                                <textarea id="gb-message" required rows="3" placeholder="Pesan kamu..." class="w-full bg-dark-bg border border-white/10 rounded-lg px-4 py-3 text-white focus:border-electric-purple focus:outline-none transition-colors resize-none"></textarea>
-                            </div>
-                            <button type="submit" class="w-full bg-gradient-to-r from-cyber-blue to-electric-purple text-white font-bold py-3 rounded-lg hover:scale-[1.02] transition-transform shadow-[0_4px_15px_rgba(0,212,255,0.3)]">Kirim Pesan</button>
-                        </form>
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-8 reveal">
+                    <!-- Form Column -->
+                    <div class="lg:col-span-2">
+                        <div class="glass p-6 rounded-2xl border-t border-t-cyber-blue/30 sticky top-28">
+                            <h3 class="text-white font-semibold mb-4 flex items-center gap-2"><span class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyber-blue/20 to-electric-purple/20 flex items-center justify-center text-sm">✍️</span> Tulis Pesan</h3>
+                            <form id="guestbook-form" class="space-y-4">
+                                <div>
+                                    <label class="text-xs text-text-secondary mb-1.5 block">Nama Kamu</label>
+                                    <input type="text" id="gb-name" required placeholder="Masukkan nama..." class="w-full bg-dark-bg/80 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-cyber-blue focus:ring-1 focus:ring-cyber-blue/30 focus:outline-none transition-all text-sm">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-text-secondary mb-1.5 block">Pesan</label>
+                                    <textarea id="gb-message" required rows="4" placeholder="Tulis pesan, kesan, atau salam..." class="w-full bg-dark-bg/80 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-electric-purple focus:ring-1 focus:ring-electric-purple/30 focus:outline-none transition-all resize-none text-sm"></textarea>
+                                </div>
+                                <button type="submit" class="w-full bg-gradient-to-r from-cyber-blue to-electric-purple text-white font-bold py-3.5 rounded-xl hover:scale-[1.02] transition-transform shadow-[0_4px_20px_rgba(0,212,255,0.3)] flex items-center justify-center gap-2">
+                                    <span>Kirim Pesan</span>
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                                </button>
+                            </form>
+                        </div>
                     </div>
                     
-                    <div class="glass p-6 rounded-2xl max-h-[300px] overflow-y-auto hide-scrollbar" id="guestbook-list">
-                        <p class="text-text-secondary text-center italic mt-10" id="gb-empty">Belum ada pesan. Jadilah yang pertama!</p>
+                    <!-- Messages Column -->
+                    <div class="lg:col-span-3">
+                        <div class="glass p-5 rounded-2xl max-h-[500px] overflow-y-auto hide-scrollbar" id="guestbook-list">
+                            <p class="text-text-secondary text-center italic py-12" id="gb-empty">Belum ada pesan. Jadilah yang pertama! 🚀</p>
+                        </div>
                     </div>
                 </div>
             </div>

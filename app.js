@@ -9,14 +9,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Ambil data: selalu dari MongoDB API (real-time), fallback ke data.json
     async function loadData() {
         try {
-            // Selalu fetch dari MongoDB API agar data selalu real-time
-            // (tidak lagi bergantung pada localStorage yang hanya lokal browser)
-            const studentRes = await fetch('api/students');
+            // Fetch students dan gallery sekaligus dari MongoDB API (real-time)
+            const [studentRes, galleryRes] = await Promise.all([
+                fetch('api/students'),
+                fetch('api/gallery').catch(() => ({ json: () => ({ success: false }) }))
+            ]);
             const studentJson = await studentRes.json();
+            const galleryJson = await galleryRes.json();
 
             if (studentJson.success && studentJson.data && studentJson.data.length > 0) {
                 // Map data MongoDB ke format yang dipakai app.js
-                // MongoDB pakai _id (ObjectId), tapi kode lama pakai id (number) dan sort_order
                 studentsData = studentJson.data.map(s => ({
                     id: s.sort_order || parseInt(s._id.toString().slice(-4), 16) % 100 || 1,
                     _id: s._id,
@@ -25,17 +27,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     motto: s.motto || '',
                     dream: s.dream || '',
                     color: s.color || '00d4ff',
-                    photo: s.photo || null
+                    photo: s.photo || null,
+                    username: s.username || null
                 }));
 
-                // Gallery & projek masih dari localStorage atau data.json (belum ada API-nya)
-                const lsGallery  = localStorage.getItem('xrpl_gallery_db');
-                const lsProjects = localStorage.getItem('xrpl_projects_db');
-                galleryData  = lsGallery  ? JSON.parse(lsGallery)  : [];
-                projectsData = lsProjects ? JSON.parse(lsProjects) : [];
-
-                // Jika gallery masih kosong, ambil dari data.json
-                if (galleryData.length === 0) {
+                // Gallery dari MongoDB API (real-time), fallback ke data.json
+                if (galleryJson.success && galleryJson.data && galleryJson.data.length > 0) {
+                    galleryData = galleryJson.data;
+                } else {
+                    // Fallback ke data.json
                     try {
                         const fallback = await fetch('data.json');
                         const fallbackData = await fallback.json();
@@ -43,10 +43,28 @@ document.addEventListener('DOMContentLoaded', () => {
                     } catch(e) { galleryData = []; }
                 }
 
+                // Projects dari MongoDB API (real-time), fallback ke localStorage
+                try {
+                    const projRes = await fetch('api/projects').catch(() => ({ json: () => ({ success: false }) }));
+                    const projJson = await projRes.json();
+                    if (projJson.success && projJson.data) {
+                        projectsData = projJson.data;
+                    } else {
+                        const lsProjects = localStorage.getItem('xrpl_projects_db');
+                        projectsData = lsProjects ? JSON.parse(lsProjects) : [];
+                    }
+                } catch(e) {
+                    const lsProjects = localStorage.getItem('xrpl_projects_db');
+                    projectsData = lsProjects ? JSON.parse(lsProjects) : [];
+                }
+
                 renderStudents();
                 renderGallery();
                 renderProjects();
+                updateCounterStats();
+                loadStrukturKelas();
                 hilangkanLoadingScreen();
+
             } else {
                 // Fallback: fetch dari data.json jika MongoDB kosong atau belum di-setup
                 const response = await fetch('data.json');
@@ -57,6 +75,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 projectsData = [];
                 renderStudents();
                 renderGallery();
+                updateCounterStats();
+                loadStrukturKelas();
                 hilangkanLoadingScreen();
             }
         } catch (error) {
@@ -199,32 +219,46 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // 3. FITUR BUKU TAMU (LOCALSTORAGE)
+    // 3. PESAN SINGKAT / GUESTBOOK (MONGODB API)
     // ==========================================
     function initGuestbook() {
         const form = document.getElementById('guestbook-form');
         const list = document.getElementById('guestbook-list');
         const emptyMsg = document.getElementById('gb-empty');
 
-        let messages = JSON.parse(localStorage.getItem('xrpl_guestbook')) || [];
-
-        const renderMessages = () => {
-            if (messages.length === 0) {
-                emptyMsg.style.display = 'block';
-                return;
-            }
-            emptyMsg.style.display = 'none';
-            Array.from(list.children).forEach(child => { if (child.id !== 'gb-empty') child.remove(); });
-            
-            messages.slice().reverse().forEach(msg => {
-                const div = document.createElement('div');
-                div.className = 'bg-white/5 p-4 rounded-xl border border-white/10 mb-3 animate-fade-in-up';
-                div.innerHTML = `
-                    <h4 class="font-bold text-cyber-blue text-sm">${msg.name}</h4>
-                    <p class="text-text-secondary text-sm mt-1 break-words">${msg.text}</p>
-                    <span class="text-[10px] text-white/30 mt-2 block">${msg.date}</span>
-                `;
-                list.appendChild(div);
+        // Load messages from MongoDB
+        const loadMessages = () => {
+            fetch('api/guestbook')
+            .then(r => r.json())
+            .then(res => {
+                if (!res.success) throw new Error(res.message);
+                const messages = res.data;
+                if (messages.length === 0) {
+                    emptyMsg.style.display = 'block';
+                    return;
+                }
+                emptyMsg.style.display = 'none';
+                Array.from(list.children).forEach(child => { if (child.id !== 'gb-empty') child.remove(); });
+                messages.forEach(msg => {
+                    const div = document.createElement('div');
+                    div.className = 'ps-msg-card mb-3 animate-fade-in-up';
+                    div.innerHTML = `
+                        <div class="flex items-start gap-3 pl-2">
+                            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyber-blue/30 to-electric-purple/30 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">${(msg.name||'?')[0].toUpperCase()}</div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-baseline gap-2 flex-wrap mb-1">
+                                    <span class="text-white text-sm font-semibold">${msg.name}</span>
+                                    <span class="text-white/30 text-[10px]">${msg.date}</span>
+                                </div>
+                                <p class="text-text-secondary text-sm break-words leading-relaxed">${msg.text}</p>
+                            </div>
+                        </div>
+                    `;
+                    list.appendChild(div);
+                });
+            })
+            .catch(() => {
+                // Tetap tampilkan form walau gagal load
             });
         };
 
@@ -233,21 +267,32 @@ document.addEventListener('DOMContentLoaded', () => {
             const nameInput = document.getElementById('gb-name');
             const msgInput = document.getElementById('gb-message');
             
-            const newMsg = {
-                name: nameInput.value,
-                text: msgInput.value,
-                date: new Date().toLocaleDateString('id-ID', { hour: '2-digit', minute:'2-digit' })
-            };
+            const btn = form.querySelector('button[type="submit"]');
+            if (btn) btn.disabled = true;
 
-            messages.push(newMsg);
-            localStorage.setItem('xrpl_guestbook', JSON.stringify(messages));
-            
-            nameInput.value = '';
-            msgInput.value = '';
-            renderMessages();
+            fetch('api/guestbook', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: nameInput.value.trim(), text: msgInput.value.trim() })
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (btn) btn.disabled = false;
+                if (res.success) {
+                    nameInput.value = '';
+                    msgInput.value = '';
+                    loadMessages();
+                } else {
+                    alert(res.message || 'Gagal kirim pesan.');
+                }
+            })
+            .catch(() => {
+                if (btn) btn.disabled = false;
+                alert('Gagal koneksi ke server.');
+            });
         });
 
-        renderMessages();
+        loadMessages();
     }
 
     // ==========================================
@@ -393,6 +438,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const sections = document.querySelectorAll('section');
     const navLinks = document.querySelectorAll('.nav-link');
     const backToTop = document.getElementById('back-to-top');
+
+    // Fix: Back-to-top click handler — HARUS di luar scroll handler
+    backToTop.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
 
     window.addEventListener('scroll', () => {
         let current = '';
@@ -596,7 +646,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const dataIndex = currentVisibleGallery[currentLbIndex];
             const data = galleryData[dataIndex];
             
-            lbImg.src = `https://placehold.co/1200x800/${data.color}/fff?text=${data.title.replace(/ /g, '+')}`;
+            // Fix: Gunakan foto asli jika ada, baru fallback ke placeholder
+            const imgUrl = (data.image && data.image.length > 0)
+                ? data.image
+                : `https://placehold.co/1200x800/${data.color}/fff?text=${(data.title || 'Photo').replace(/ /g, '+')}`;
+            lbImg.src = imgUrl;
             lbCaption.innerText = data.title;
             lbCounter.innerText = `${currentLbIndex + 1} / ${currentVisibleGallery.length}`;
             
@@ -878,6 +932,152 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         setTimeout(type, 1000);
+    }
+
+    // ==========================================
+    // 11. COUNTER STATS DARI DATABASE
+    // ==========================================
+    function updateCounterStats() {
+        const counters = document.querySelectorAll('.counter');
+        counters.forEach(counter => {
+            const label = counter.closest('div')?.nextElementSibling?.textContent?.trim()?.toLowerCase() || '';
+            if (label.includes('murid')) {
+                counter.setAttribute('data-target', studentsData.length || 0);
+            } else if (label.includes('projek')) {
+                counter.setAttribute('data-target', projectsData.length || 0);
+            } else if (label.includes('kenangan') || label.includes('memori')) {
+                counter.setAttribute('data-target', galleryData.length || 0);
+            }
+            // Keluarga tetap 1
+        });
+    }
+
+    // ==========================================
+    // 12. STRUKTUR KELAS DINAMIS (MONGODB)
+    // ==========================================
+    function loadStrukturKelas() {
+        const container = document.getElementById('struktur-tree');
+        if (!container) return;
+
+        fetch('api/struktur')
+            .then(r => r.json())
+            .then(res => {
+                if (!res.success || !res.data || res.data.length === 0) {
+                    // Jika belum ada data di MongoDB, biarkan konten default
+                    return;
+                }
+                renderStrukturTree(container, res.data);
+            })
+            .catch(() => {
+                // Jika API gagal, biarkan konten default
+            });
+    }
+
+    function renderStrukturTree(container, data) {
+        // Kelompokkan berdasarkan level
+        const waliKelas = data.filter(d => parseFloat(d.level) === 0);
+        const guruProduktif = data.filter(d => parseFloat(d.level) === 0.5).slice(0, 5);
+        const ketuaWakil = data.filter(d => parseFloat(d.level) === 1);
+        const staff = data.filter(d => parseFloat(d.level) === 2);
+        const anggota = data.filter(d => parseFloat(d.level) === 3);
+
+        const avatarUrl = (name, color) => {
+            return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=${color || '00d4ff'}&color=fff&size=150`;
+        };
+
+        const makeCard = (person, sizeClass = 'w-12 h-12 md:w-16 md:h-16', textSize = 'text-xs md:text-sm', subText = 'text-[10px] md:text-xs') => {
+            const photo = person.photo || avatarUrl(person.name, person.color);
+            return `
+                <img src="${photo}" alt="${escHtml(person.jabatan)}" class="${sizeClass} rounded-full mx-auto mb-2 object-cover border-2" style="border-color:#${person.color || '00d4ff'}55" loading="lazy">
+                <h3 class="font-semibold text-white ${textSize} truncate w-full px-1">${escHtml(person.name)}</h3>
+                <p class="${subText} font-medium" style="color:#${person.color || '00d4ff'}">${escHtml(person.jabatan)}</p>
+            `;
+        };
+
+        let html = '';
+
+        // ── Level 0: Wali Kelas ──
+        if (waliKelas.length > 0) {
+            const wk = waliKelas[0];
+            html += `
+            <div class="flex flex-col items-center reveal w-full">
+                <div class="glass w-56 md:w-64 rounded-2xl p-5 text-center border-t border-t-cyber-blue relative z-10 hover:scale-105 transition-transform duration-300 hover:shadow-[0_0_20px_rgba(0,212,255,0.2)]">
+                    ${makeCard(wk, 'w-16 h-16 md:w-20 md:h-20', 'text-base md:text-lg', 'text-xs md:text-sm')}
+                </div>
+                <div class="struktur-line-v w-[2px] h-8 md:h-12"></div>
+            </div>`;
+        }
+
+        // ── Level 0.5: Guru Produktif (maks 5) ──
+        if (guruProduktif.length > 0) {
+            const gpCount = guruProduktif.length;
+            html += `
+            <div class="relative w-full max-w-4xl reveal delay-50">
+                <div class="struktur-line-h absolute top-0 left-[${gpCount <= 1 ? '50' : gpCount <= 2 ? '25' : '10'}%] right-[${gpCount <= 1 ? '50' : gpCount <= 2 ? '25' : '10'}%] h-[2px] z-0"></div>
+                <div class="flex justify-center gap-3 md:gap-6 relative z-10 w-full flex-wrap">
+                    ${guruProduktif.map(gp => `
+                    <div class="relative flex flex-col items-center w-[130px] md:w-40">
+                        <div class="struktur-line-v absolute -top-6 md:-top-8 w-[2px] h-6 md:h-8"></div>
+                        <div class="glass w-full rounded-2xl p-3 md:p-4 text-center hover:scale-105 transition-transform duration-300 hover:shadow-[0_0_15px_rgba(255,193,7,0.2)] border-t" style="border-top-color:#f59e0b55">
+                            ${makeCard(gp)}
+                        </div>
+                        <div class="struktur-line-v w-[2px] h-4 md:h-6"></div>
+                    </div>`).join('')}
+                </div>
+            </div>`;
+        }
+
+        // ── Level 1: Ketua / Wakil ──
+        if (ketuaWakil.length > 0) {
+            html += `
+            <div class="relative w-full max-w-2xl reveal delay-100">
+                <div class="struktur-line-h absolute top-0 left-[20%] right-[20%] md:left-1/4 md:right-1/4 h-[2px] z-0"></div>
+                <div class="flex justify-center gap-4 md:gap-32 relative z-10 w-full">
+                    ${ketuaWakil.map(kw => `
+                    <div class="relative flex flex-col items-center w-1/2 max-w-[180px] md:w-48">
+                        <div class="struktur-line-v absolute -top-8 md:-top-12 w-[2px] h-8 md:h-12"></div>
+                        <div class="glass w-full rounded-2xl p-3 md:p-4 text-center hover:scale-105 transition-transform duration-300 hover:shadow-[0_0_15px_rgba(123,47,247,0.2)]">
+                            ${makeCard(kw)}
+                        </div>
+                        <div class="struktur-line-v w-[2px] h-6 md:h-8"></div>
+                    </div>`).join('')}
+                </div>
+            </div>`;
+        }
+
+        // ── Level 2: Staff (Sekretaris / Bendahara) ──
+        if (staff.length > 0) {
+            html += `
+            <div class="relative w-full max-w-3xl reveal delay-200">
+                <div class="struktur-line-h absolute top-0 left-[10%] right-[10%] h-[2px] z-0"></div>
+                <div class="grid grid-cols-2 md:grid-cols-${Math.min(staff.length, 4)} gap-3 md:gap-4 relative z-10 w-full px-2 mt-0">
+                    ${staff.map(st => `
+                    <div class="relative flex flex-col items-center">
+                        <div class="struktur-line-v absolute -top-6 md:-top-8 w-[2px] h-6 md:h-8"></div>
+                        <div class="glass w-full max-w-[150px] rounded-2xl p-3 text-center hover:scale-105 transition-transform">
+                            ${makeCard(st, 'w-10 h-10 md:w-14 md:h-14', 'text-[11px] md:text-xs', 'text-[9px] md:text-[10px]')}
+                        </div>
+                    </div>`).join('')}
+                </div>
+            </div>`;
+        }
+
+        // ── Level 3: Anggota ──
+        if (anggota.length > 0) {
+            html += `
+            <div class="relative w-full max-w-4xl reveal delay-300 mt-6">
+                <div class="struktur-line-h w-full h-[2px] mb-4"></div>
+                <div class="grid grid-cols-3 md:grid-cols-${Math.min(anggota.length, 5)} gap-3 md:gap-4 relative z-10 w-full px-2">
+                    ${anggota.map(ag => `
+                    <div class="glass w-full rounded-xl p-2 md:p-3 text-center hover:scale-105 transition-transform">
+                        ${makeCard(ag, 'w-8 h-8 md:w-12 md:h-12', 'text-[10px] md:text-xs', 'text-[8px] md:text-[10px]')}
+                    </div>`).join('')}
+                </div>
+            </div>`;
+        }
+
+        container.innerHTML = html;
+        initScrollAnimations();
     }
 
     // INIT
