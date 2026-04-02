@@ -15,11 +15,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const galleryJson = await window.apiFetch('api/gallery');
 
             if (studentJson && studentJson.success && studentJson.data) {
+                
+                // 👇👇👇 TAMBAHKAN KODE ANTI-CRASH INI DI SINI 👇👇👇
+                if (studentJson.data.length === 0) {
+                    studentJson.data = [
+                        { _id: "dummy1", sort_order: 1, name: "Sistem Menunggu Data", jabatan: "Ketua Murid", color: "555555" },
+                        { _id: "dummy2", sort_order: 2, name: "Tambahkan Via Dashboard", jabatan: "Wakil Ketua", color: "555555" }
+                    ];
+                }
+                // 👆👆👆 --------------------------------------- 👆👆👆
+
                 // Map data MongoDB ke format yang dipakai app.js
                 studentsData = studentJson.data.map(s => ({
                     id: s.sort_order || 1,
                     _id: s._id,
                     name: s.name || s.full_name,
+                    // ... kode kamu selanjutnya tidak perlu diubah ...
                     quote: s.quote || '',
                     motto: s.motto || '',
                     dream: s.dream || '',
