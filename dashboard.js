@@ -19,6 +19,166 @@ function hideLoading() {
     }
 }
 
+// ── IMAGE COMPRESSOR ──────────────────────────────────────────
+// Kompresi gambar otomatis di browser jika > 5MB
+// Menggunakan Canvas API dengan iterative quality reduction
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB target
+
+/**
+ * Kompres gambar ke ≤ 5MB tanpa terlalu merusak kualitas.
+ * Menggunakan strategi:
+ * 1. Resize dimensi jika sangat besar (> 3000px)
+ * 2. Iterasi quality JPEG/WebP dari 0.92 turun sampai ukuran ≤ 5MB
+ * 
+ * @param {File} file - File gambar asli
+ * @param {object} options - { onProgress: Function, maxSize: number }
+ * @returns {Promise<{file: File, blob: Blob, dataUrl: string, compressed: boolean, originalSize: number, newSize: number}>}
+ */
+async function compressImage(file, options = {}) {
+    const maxSize = options.maxSize || MAX_IMAGE_SIZE;
+    const originalSize = file.size;
+
+    // Jika sudah di bawah limit, return langsung
+    if (file.size <= maxSize) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                resolve({
+                    file: file,
+                    blob: file,
+                    dataUrl: e.target.result,
+                    compressed: false,
+                    originalSize: originalSize,
+                    newSize: originalSize
+                });
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // Perlu kompresi
+    if (options.onProgress) options.onProgress('Memuat gambar...');
+
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+
+        img.onload = async () => {
+            URL.revokeObjectURL(objectUrl);
+
+            try {
+                let { width, height } = img;
+
+                // Step 1: Resize dimensi jika terlalu besar
+                const MAX_DIMENSION = 3000;
+                if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+                    const ratio = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
+                    width = Math.round(width * ratio);
+                    height = Math.round(height * ratio);
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // Step 2: Iterasi quality dari tinggi ke rendah
+                const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+                const outputMime = file.type === 'image/png' ? 'image/jpeg' : mimeType; // PNG convert ke JPEG untuk compress
+                let quality = 0.92;
+                let blob = null;
+                let attempts = 0;
+                const maxAttempts = 15;
+
+                while (quality > 0.1 && attempts < maxAttempts) {
+                    if (options.onProgress) {
+                        options.onProgress(`Mengompres... (kualitas: ${Math.round(quality * 100)}%)`);
+                    }
+
+                    blob = await new Promise(res => canvas.toBlob(res, outputMime, quality));
+
+                    if (blob.size <= maxSize) break;
+
+                    // Turunkan quality lebih agresif jika masih jauh dari target
+                    const sizeRatio = blob.size / maxSize;
+                    if (sizeRatio > 3) {
+                        quality -= 0.15;
+                    } else if (sizeRatio > 2) {
+                        quality -= 0.10;
+                    } else if (sizeRatio > 1.5) {
+                        quality -= 0.07;
+                    } else {
+                        quality -= 0.05;
+                    }
+                    quality = Math.max(quality, 0.1);
+                    attempts++;
+                }
+
+                // Step 3: Jika masih terlalu besar, resize dimensi lebih kecil
+                if (blob.size > maxSize) {
+                    let scale = 0.85;
+                    while (blob.size > maxSize && scale > 0.3) {
+                        const newW = Math.round(width * scale);
+                        const newH = Math.round(height * scale);
+                        canvas.width = newW;
+                        canvas.height = newH;
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
+                        ctx.drawImage(img, 0, 0, newW, newH);
+
+                        blob = await new Promise(res => canvas.toBlob(res, outputMime, 0.8));
+                        if (blob.size <= maxSize) break;
+                        scale -= 0.1;
+
+                        if (options.onProgress) {
+                            options.onProgress(`Resize gambar... (${Math.round(scale * 100)}%)`);
+                        }
+                    }
+                }
+
+                // Convert blob ke dataUrl dan File
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const ext = outputMime === 'image/jpeg' ? '.jpg' : '.webp';
+                    const newFileName = file.name.replace(/\.[^.]+$/, '') + '_compressed' + ext;
+                    const compressedFile = new File([blob], newFileName, { type: outputMime });
+
+                    resolve({
+                        file: compressedFile,
+                        blob: blob,
+                        dataUrl: e.target.result,
+                        compressed: true,
+                        originalSize: originalSize,
+                        newSize: blob.size
+                    });
+                };
+                reader.readAsDataURL(blob);
+            } catch (err) {
+                reject(err);
+            }
+        };
+
+        img.onerror = () => {
+            URL.revokeObjectURL(objectUrl);
+            reject(new Error('Gagal memuat gambar untuk kompresi'));
+        };
+
+        img.src = objectUrl;
+    });
+}
+
+/**
+ * Format ukuran file ke string yang mudah dibaca
+ */
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
 // ── HELPER FETCH ────────────────────────────────────────────
 async function safeFetch(url, options = {}) {
     const isMutation = options.method && options.method !== 'GET';
@@ -348,21 +508,28 @@ function openStudentModal(studentId = null) {
 
 function editStudent(id) { openStudentModal(id); }
 
-function previewStudentPhoto(input) {
+async function previewStudentPhoto(input) {
     const file = input.files ? input.files[0] : input;
     if (!file) return;
-    // Validasi di frontend: max 5MB, image only
-    if (file.size > 5 * 1024 * 1024) { showToast('File terlalu besar! Maks 5MB.', 'error'); return; }
     if (!file.type.startsWith('image/')) { showToast('Hanya file gambar yang diperbolehkan!', 'error'); return; }
     
-    const reader = new FileReader();
-    reader.onload = e => {
-        currentStudentPhotoData = e.target.result;
-        document.getElementById('student-photo-preview').src = e.target.result;
+    try {
+        if (file.size > MAX_IMAGE_SIZE) {
+            showToast(`📦 Gambar ${formatFileSize(file.size)} sedang dikompres...`, 'info');
+        }
+        const result = await compressImage(file, {
+            onProgress: (msg) => showToast(`📦 ${msg}`, 'info')
+        });
+        currentStudentPhotoData = result.dataUrl;
+        document.getElementById('student-photo-preview').src = result.dataUrl;
         document.getElementById('student-photo-preview').classList.remove('hidden');
         document.getElementById('student-photo-placeholder').classList.add('hidden');
-    };
-    reader.readAsDataURL(file);
+        if (result.compressed) {
+            showToast(`✅ Gambar dikompres: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.newSize)}`);
+        }
+    } catch (err) {
+        showToast('Gagal memproses gambar: ' + err.message, 'error');
+    }
 }
 
 function setStudentColor(color, el) {
@@ -498,17 +665,26 @@ function openStrukturModal(id = null) {
 
 function editStruktur(id) { openStrukturModal(id); }
 
-function previewStrukturPhoto(input) {
+async function previewStrukturPhoto(input) {
     const file = input.files[0]; if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { showToast('File terlalu besar! Maks 5MB.', 'error'); return; }
-    const reader = new FileReader();
-    reader.onload = e => {
-        currentStrukturPhotoData = e.target.result;
-        document.getElementById('struktur-photo-preview').src = e.target.result;
+    
+    try {
+        if (file.size > MAX_IMAGE_SIZE) {
+            showToast(`📦 Gambar ${formatFileSize(file.size)} sedang dikompres...`, 'info');
+        }
+        const result = await compressImage(file, {
+            onProgress: (msg) => showToast(`📦 ${msg}`, 'info')
+        });
+        currentStrukturPhotoData = result.dataUrl;
+        document.getElementById('struktur-photo-preview').src = result.dataUrl;
         document.getElementById('struktur-photo-preview').classList.remove('hidden');
         document.getElementById('struktur-photo-clear').classList.remove('hidden');
-    };
-    reader.readAsDataURL(file);
+        if (result.compressed) {
+            showToast(`✅ Gambar dikompres: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.newSize)}`);
+        }
+    } catch (err) {
+        showToast('Gagal memproses gambar: ' + err.message, 'error');
+    }
 }
 
 function clearStrukturPhoto() {
@@ -634,15 +810,24 @@ function openProjectModal(id = null) {
 
 function editProject(id) { openProjectModal(id); }
 
-function previewProjectImage(input) {
+async function previewProjectImage(input) {
     const file = input.files[0]; if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { showToast('File terlalu besar! Maks 5MB.', 'error'); return; }
-    const reader = new FileReader();
-    reader.onload = e => {
-        currentProjectImageData = e.target.result;
-        document.getElementById('project-img-preview-wrap').innerHTML = `<img src="${e.target.result}" class="max-h-32 rounded-lg mx-auto">`;
-    };
-    reader.readAsDataURL(file);
+    
+    try {
+        if (file.size > MAX_IMAGE_SIZE) {
+            showToast(`📦 Gambar ${formatFileSize(file.size)} sedang dikompres...`, 'info');
+        }
+        const result = await compressImage(file, {
+            onProgress: (msg) => showToast(`📦 ${msg}`, 'info')
+        });
+        currentProjectImageData = result.dataUrl;
+        document.getElementById('project-img-preview-wrap').innerHTML = `<img src="${result.dataUrl}" class="max-h-32 rounded-lg mx-auto">`;
+        if (result.compressed) {
+            showToast(`✅ Gambar dikompres: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.newSize)}`);
+        }
+    } catch (err) {
+        showToast('Gagal memproses gambar: ' + err.message, 'error');
+    }
 }
 
 document.getElementById('project-form').addEventListener('submit', function(e) {
@@ -752,15 +937,24 @@ function openGalleryModal(id = null) {
 
 function editGallery(id) { openGalleryModal(id); }
 
-function previewGalleryImage(input) {
+async function previewGalleryImage(input) {
     const file = input.files[0]; if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { showToast('File terlalu besar! Maks 5MB.', 'error'); return; }
-    const reader = new FileReader();
-    reader.onload = e => {
-        currentGalleryImageData = e.target.result;
-        document.getElementById('gallery-img-preview-wrap').innerHTML = `<img src="${e.target.result}" class="max-h-32 rounded-lg mx-auto">`;
-    };
-    reader.readAsDataURL(file);
+    
+    try {
+        if (file.size > MAX_IMAGE_SIZE) {
+            showToast(`📦 Gambar ${formatFileSize(file.size)} sedang dikompres...`, 'info');
+        }
+        const result = await compressImage(file, {
+            onProgress: (msg) => showToast(`📦 ${msg}`, 'info')
+        });
+        currentGalleryImageData = result.dataUrl;
+        document.getElementById('gallery-img-preview-wrap').innerHTML = `<img src="${result.dataUrl}" class="max-h-32 rounded-lg mx-auto">`;
+        if (result.compressed) {
+            showToast(`✅ Gambar dikompres: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.newSize)}`);
+        }
+    } catch (err) {
+        showToast('Gagal memproses gambar: ' + err.message, 'error');
+    }
 }
 
 document.getElementById('gallery-form').addEventListener('submit', function(e) {
@@ -1089,39 +1283,33 @@ function loadMyProfile() {
 }
 
 async function uploadMyPhoto(input) {
-    let file = input.files[0];
+    const file = input.files[0];
     if (!file) return;
-
-    // Jika file > 5MB, kompres
-    if (file.size > 5 * 1024 * 1024) {
-        showToast('File besar, mengompres...', 'info');
-        try {
-            const options = {
-                maxSizeMB: 5,
-                maxWidthOrHeight: 1920, // Optional: resize jika perlu
-                useWebWorker: true,
-                quality: 0.9 // Kualitas tinggi untuk minimize loss
-            };
-            file = await imageCompression(file, options);
-            showToast('Kompresi selesai!', 'success');
-        } catch (error) {
-            showToast('Gagal kompres gambar: ' + error.message, 'error');
-            return;
+    
+    try {
+        let uploadFile = file;
+        
+        // Auto-compress jika > 5MB
+        if (file.size > MAX_IMAGE_SIZE) {
+            showToast(`📦 Gambar ${formatFileSize(file.size)} sedang dikompres...`, 'info');
+            const result = await compressImage(file, {
+                onProgress: (msg) => showToast(`📦 ${msg}`, 'info')
+            });
+            uploadFile = result.file;
+            showToast(`✅ Dikompres: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.newSize)}`);
         }
-    }
+        
+        const formData = new FormData();
+        formData.append('type', 'students');
+        formData.append('id', window.CURRENT_MONGO_ID || window.CURRENT_USER_ID);
+        formData.append('photo', uploadFile);
 
-    const formData = new FormData();
-    formData.append('type', 'students');
-    formData.append('id', window.CURRENT_MONGO_ID || window.CURRENT_USER_ID);
-    formData.append('photo', file);
+        showToast('⏳ Mengupload foto...', 'info');
+        showLoading();
 
-    showToast('⏳ Mengupload foto...', 'info');
-
-    showLoading();
-
-    fetch('api/upload', { method: 'POST', body: formData })
-    .then(res => res.json())
-    .then(data => {
+        const res = await fetch('api/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+        
         if(data.success) {
             document.getElementById('my-photo-preview').src = data.photo_url;
             showToast('Foto profil berhasil diunggah!');
@@ -1129,11 +1317,11 @@ async function uploadMyPhoto(input) {
         } else {
             showToast(data.message || 'Gagal upload foto.', 'error');
         }
-    })
-    .catch(err => {
-        showToast('Kesalahan koneksi saat upload.', 'error');
-    })
-    .finally(() => hideLoading());
+    } catch (err) {
+        showToast('Kesalahan koneksi saat upload: ' + err.message, 'error');
+    } finally {
+        hideLoading();
+    }
 }
 
 function saveMyProfile(e) {
@@ -1196,77 +1384,88 @@ function openMySnapshotModal() {
     openModal('snapshot-modal');
 }
 
-function previewSnapshotImage(input) {
+// Simpan file snapshot yang sudah di-compress (jika perlu)
+let _compressedSnapshotFile = null;
+
+async function previewSnapshotImage(input) {
     const file = input.files[0];
-    if(file) {
-        const reader = new FileReader();
-        reader.onload = e => {
-            const preview = document.getElementById('snapshot-preview');
-            preview.src = e.target.result;
-            preview.classList.remove('hidden');
-            document.getElementById('snapshot-placeholder').classList.add('hidden');
-        };
-        reader.readAsDataURL(file);
+    if(!file) return;
+    
+    try {
+        if (file.size > MAX_IMAGE_SIZE) {
+            showToast(`📦 Gambar ${formatFileSize(file.size)} sedang dikompres...`, 'info');
+        }
+        const result = await compressImage(file, {
+            onProgress: (msg) => showToast(`📦 ${msg}`, 'info')
+        });
+        
+        _compressedSnapshotFile = result.compressed ? result.file : null;
+        
+        const preview = document.getElementById('snapshot-preview');
+        preview.src = result.dataUrl;
+        preview.classList.remove('hidden');
+        document.getElementById('snapshot-placeholder').classList.add('hidden');
+        
+        if (result.compressed) {
+            showToast(`✅ Gambar dikompres: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.newSize)}`);
+        }
+    } catch (err) {
+        showToast('Gagal memproses gambar: ' + err.message, 'error');
     }
 }
 
 async function saveMySnapshot(e) {
     e.preventDefault();
     const btn = document.getElementById('snapshot-save-btn');
-    let imageFile = document.getElementById('snapshot-input').files[0];
+    const originalFile = document.getElementById('snapshot-input').files[0];
     const caption = document.getElementById('snapshot-caption').value;
 
-    if (!imageFile) return showToast('Pilih foto terlebih dahulu!', 'error');
-
-    // Jika file > 5MB, kompres
-    if (imageFile.size > 5 * 1024 * 1024) {
-        showToast('File besar, mengompres...', 'info');
-        try {
-            const options = {
-                maxSizeMB: 5,
-                maxWidthOrHeight: 1920,
-                useWebWorker: true,
-                quality: 0.9
-            };
-            imageFile = await imageCompression(imageFile, options);
-            showToast('Kompresi selesai!', 'success');
-        } catch (error) {
-            showToast('Gagal kompres gambar: ' + error.message, 'error');
-            return;
-        }
-    }
+    if (!originalFile) return showToast('Pilih foto terlebih dahulu!', 'error');
 
     btn.disabled = true;
     btn.textContent = '⏳ Uploading...';
 
-    const studentId = window.CURRENT_MONGO_ID || window.CURRENT_USER_ID;
+    try {
+        // Gunakan file yang sudah di-compress (jika ada), atau file asli
+        let uploadFile = _compressedSnapshotFile || originalFile;
+        
+        // Safety check: jika file masih > 5MB (misal user ganti file tanpa preview)
+        if (uploadFile.size > MAX_IMAGE_SIZE) {
+            showToast('📦 Mengompres gambar sebelum upload...', 'info');
+            const result = await compressImage(uploadFile);
+            uploadFile = result.file;
+        }
 
-    const formData = new FormData();
-    formData.append('image', imageFile);
-    formData.append('caption', caption);
-    formData.append('student_id', studentId);
+        const studentId = window.CURRENT_MONGO_ID || window.CURRENT_USER_ID;
 
-    showLoading();
+        const formData = new FormData();
+        formData.append('image', uploadFile);
+        formData.append('caption', caption);
+        formData.append('student_id', studentId);
 
-    fetch('api/snapshots', { method: 'POST', body: formData })
-    .then(res => res.json())
-    .then(res => {
+        showLoading();
+
+        const res = await fetch('api/snapshots', { method: 'POST', body: formData });
+        const data = await res.json();
+        
         btn.disabled = false;
         btn.textContent = '📤 Upload';
-        if (res.success) {
+        
+        if (data.success) {
             showToast('Snapshot berhasil diunggah!');
             closeModal('snapshot-modal');
+            _compressedSnapshotFile = null;
             loadMySnapshots();
         } else {
-            showToast(res.message || 'Gagal upload snapshot.', 'error');
+            showToast(data.message || 'Gagal upload snapshot.', 'error');
         }
-    })
-    .catch(() => {
+    } catch (err) {
         btn.disabled = false;
         btn.textContent = '📤 Upload';
-        showToast('Gagal koneksi ke server!', 'error');
-    })
-    .finally(() => hideLoading());
+        showToast('Gagal koneksi ke server: ' + err.message, 'error');
+    } finally {
+        hideLoading();
+    }
 }
 
 function deleteMySnapshot(id) {

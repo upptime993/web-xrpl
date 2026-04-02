@@ -532,7 +532,7 @@
                         </div>
                         <div>
                             <p class="text-xs text-cyber-blue mb-1">Klik foto untuk mengganti avatar</p>
-                            <p class="text-xs text-gray-500">Gunakan rasio 1:1, maks 5MB.</p>
+                            <p class="text-xs text-gray-500">Gambar >5MB akan otomatis dikompres.</p>
                         </div>
                     </div>
 
@@ -626,7 +626,7 @@
                     <div class="upload-zone" id="student-upload-zone">
                         <input type="file" id="student-photo-input" accept="image/*" class="hidden" onchange="previewStudentPhoto(this)">
                         <p class="text-xs text-gray-500 mb-2">Drag & drop atau klik untuk upload</p>
-                        <p class="text-xs text-gray-600">JPG, PNG, WebP — Maks 5MB</p>
+                        <p class="text-xs text-gray-600">JPG, PNG, WebP — >5MB otomatis dikompres</p>
                     </div>
                 </div>
             </div>
@@ -840,7 +840,6 @@
         setTimeout(() => { if(l.classList.contains('opacity-0')) l.classList.add('hidden'); }, 300);
     };
 </script>
-<script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
 <script src="dashboard.js"></script>
 </body>
 </html>
