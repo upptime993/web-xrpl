@@ -58,10 +58,12 @@ document.addEventListener('DOMContentLoaded', () => {
             updateCounterStats();
             loadStrukturKelas();
             if(window.hideLoader) window.hideLoader();
+            hilangkanLoadingScreen();
 
         } catch (error) {
             console.error("Error memuat data:", error);
             if(window.hideLoader) window.hideLoader();
+            hilangkanLoadingScreen();
             document.getElementById('loading-screen').innerHTML = `
                 <div class="text-center">
                     <h1 class="text-white text-2xl mb-4">Oops! Gagal memuat data.</h1>
@@ -906,8 +908,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById('struktur-tree');
         if (!container) return;
 
-        fetch('api/struktur')
-            .then(r => r.json())
+        window.apiFetch('api/struktur')
             .then(res => {
                 if (!res.success || !res.data || res.data.length === 0) {
                     // Jika belum ada data di MongoDB, biarkan konten default
