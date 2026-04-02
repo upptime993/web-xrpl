@@ -12,13 +12,27 @@ async function safeFetch(url, options = {}) {
 }
 
 // ── AUTH CHECK (via API, not localStorage) ──────────────────
+let _authRedirecting = false;
+
 (async function checkAuth() {
     try {
-        const data = await safeFetch('api/auth');
+        const res = await fetch('api/auth');
+
+        // Kalau network error / server down, res tidak ada → masuk catch
+        // Kalau dapat response, baru parse
+        const data = await res.json();
+
         if (!data.loggedIn) {
-            window.location.href = 'login.html';
+            // Memang tidak login (token invalid/expired) → redirect
+            if (!_authRedirecting) {
+                _authRedirecting = true;
+                localStorage.removeItem('xrpl_admin_logged_in');
+                localStorage.removeItem('xrpl_admin_user');
+                window.location.href = 'login.html';
+            }
             return;
         }
+
         const user = data.user;
         // Save to localStorage for page reference only
         localStorage.setItem('xrpl_admin_logged_in', 'true');
@@ -40,9 +54,9 @@ async function safeFetch(url, options = {}) {
             window.CURRENT_USER_ID = user.id;
         }
     } catch (error) {
-        // Auth failed → redirect to login
-        localStorage.removeItem('xrpl_admin_logged_in');
-        window.location.href = 'login.html';
+        // Network error / server timeout → JANGAN redirect, cukup log
+        // Ini yang bikin loop relog sebelumnya!
+        console.warn('Auth check: network error, staying on page.', error.message);
     }
 })();
 
