@@ -51,10 +51,32 @@ export default async function handler(req, res) {
         }
     }
 
-    // --- POST: Tambah murid baru (Admin Only) ---
+    // --- POST: Tambah murid baru / Reindex (Admin Only) ---
     if (req.method === 'POST') {
         const admin = requireAdmin(req, res);
         if (!admin) return;
+
+        // Handle reindex action
+        if (req.query.action === 'reindex') {
+            try {
+                const allActive = await collection.find({ is_active: { $ne: 0 } }).sort({ name: 1 }).toArray();
+                const bulkOps = allActive.map((s, i) => ({
+                    updateOne: {
+                        filter: { _id: s._id },
+                        update: { $set: { sort_order: i + 1 } }
+                    }
+                }));
+                if (bulkOps.length > 0) {
+                    await collection.bulkWrite(bulkOps);
+                }
+                return sendSuccess(res, {
+                    message: `Berhasil re-index ${bulkOps.length} murid (urut alfabet A-Z).`
+                });
+            } catch (error) {
+                console.error('Students reindex error:', error);
+                return sendError(res, 'Server Error: ' + error.message);
+            }
+        }
 
         try {
             const body = parseBody(req);

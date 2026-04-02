@@ -23,7 +23,8 @@ export default async function handler(req, res) {
                 date: m.created_at
                     ? new Date(m.created_at).toLocaleDateString('id-ID', {
                         day: '2-digit', month: 'short', year: 'numeric',
-                        hour: '2-digit', minute: '2-digit'
+                        hour: '2-digit', minute: '2-digit',
+                        timeZone: 'Asia/Jakarta'
                     })
                     : '-'
             }));

@@ -103,7 +103,7 @@ export default async function handler(req, res) {
                 const newComment = {
                     name: name.substring(0, 50),
                     text: text.substring(0, 200),
-                    date: new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+                    date: new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Jakarta' })
                 };
 
                 await collection.updateOne(

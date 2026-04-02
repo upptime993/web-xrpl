@@ -1,7 +1,7 @@
 import getDB from './_db.js';
 import { ObjectId } from 'mongodb';
 import { sendSuccess, sendError, parseBody, isValidObjectId, getPagination } from './_helpers.js';
-import { requireAdmin } from './_auth.js';
+import { requireAdmin, requireAuth } from './_auth.js';
 import { uploadToCloudinary } from './_cloudinary.js';
 
 export default async function handler(req, res) {
@@ -31,16 +31,34 @@ export default async function handler(req, res) {
         }
     }
 
-    // --- POST: Tambah foto baru (Admin Only) ---
+    // --- POST: Tambah foto baru (Admin atau Student, student max 5/hari) ---
     if (req.method === 'POST') {
-        const admin = requireAdmin(req, res);
-        if (!admin) return;
+        const user = requireAuth(req, res);
+        if (!user) return;
 
         try {
             const body = parseBody(req);
             const { title, category, image, color } = body;
             if (!title || !title.trim()) {
                 return sendError(res, 'Judul foto wajib diisi', 400);
+            }
+
+            // Daily limit untuk student: max 5 per hari
+            if (user.role === 'student') {
+                const now = new Date();
+                const startOfDay = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+                startOfDay.setHours(0, 0, 0, 0);
+                const endOfDay = new Date(startOfDay);
+                endOfDay.setHours(23, 59, 59, 999);
+
+                const todayCount = await collection.countDocuments({
+                    uploaded_by: user.id,
+                    created_at: { $gte: startOfDay, $lte: endOfDay }
+                });
+
+                if (todayCount >= 5) {
+                    return sendError(res, 'Batas upload harian tercapai (maksimal 5 foto per hari). Coba lagi besok!', 429);
+                }
             }
 
             const catColors = { belajar: '00d4ff', keseruan: '00ff88', event: '7b2ff7', candid: 'ffae00' };
@@ -64,6 +82,10 @@ export default async function handler(req, res) {
                 color: color || catColors[category] || '7b2ff7',
                 image: imageUrl,
                 span: 'col-span-1',
+                uploaded_by: user.id || null,
+                uploader_name: user.full_name || user.username || 'Unknown',
+                uploader_username: user.username || null,
+                uploader_role: user.role || 'admin',
                 created_at: new Date()
             };
 
@@ -117,16 +139,25 @@ export default async function handler(req, res) {
         }
     }
 
-    // --- DELETE (Admin Only) ---
+    // --- DELETE (Admin atau pemilik foto) ---
     if (req.method === 'DELETE') {
-        const admin = requireAdmin(req, res);
-        if (!admin) return;
+        const user = requireAuth(req, res);
+        if (!user) return;
 
         const { id } = req.query;
         if (!id) return sendError(res, 'ID diperlukan', 400);
         if (!isValidObjectId(id)) return sendError(res, 'ID tidak valid', 400);
 
         try {
+            // Student hanya bisa menghapus foto sendiri
+            if (user.role === 'student') {
+                const photo = await collection.findOne({ _id: new ObjectId(id) });
+                if (!photo) return sendError(res, 'Foto tidak ditemukan', 404);
+                if (photo.uploaded_by !== user.id) {
+                    return sendError(res, 'Forbidden: Kamu hanya bisa menghapus foto yang kamu upload', 403);
+                }
+            }
+
             await collection.deleteOne({ _id: new ObjectId(id) });
             return sendSuccess(res, { message: 'Foto berhasil dihapus' });
         } catch (error) {
