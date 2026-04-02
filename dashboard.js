@@ -213,10 +213,10 @@ function getImgSrc(s, type = 'student') {
 function updateOverview() {
     // Fetch semua data dari MongoDB API (real-time)
     Promise.all([
-        window.apiFetch('api/students').catch(()=>({success:false,data:[]})),
-        window.apiFetch('api/gallery').catch(()=>({success:false,data:[]})),
-        window.apiFetch('api/guestbook').catch(()=>({success:false,data:[]})),
-        window.apiFetch('api/projects').catch(()=>({success:false,data:[]})),
+        fetch('api/students').then(r=>r.json()).catch(()=>({success:false,data:[]})),
+        fetch('api/gallery').then(r=>r.json()).catch(()=>({success:false,data:[]})),
+        fetch('api/guestbook').then(r=>r.json()).catch(()=>({success:false,data:[]})),
+        fetch('api/projects').then(r=>r.json()).catch(()=>({success:false,data:[]})),
     ]).then(([students, gallery, guestbook, projects]) => {
         const sc = students.success ? students.data.length : getData('students_db', DEFAULT_STUDENTS).length;
         const gc = gallery.success ? gallery.data.length : getData('gallery_db', DEFAULT_GALLERY).length;
@@ -256,7 +256,8 @@ let _studentsCache = []; // Cache data murid dari API
 
 function loadStudents() {
     showToast('Memuat data murid...', 'info');
-    window.apiFetch('api/students')
+    fetch('api/students')
+        .then(r => r.json())
         .then(data => {
             if (data.success) {
                 _studentsCache = data.data;
@@ -420,11 +421,12 @@ document.getElementById('student-form').addEventListener('submit', function(e) {
 
     if (mongoId) {
         // UPDATE murid yang sudah ada
-        window.apiFetch(`api/students?id=${mongoId}`, {
+        fetch(`api/students?id=${mongoId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         })
+        .then(r => r.json())
         .then(res => {
             if (btn) btn.disabled = false;
             if (res.success) {
@@ -438,11 +440,12 @@ document.getElementById('student-form').addEventListener('submit', function(e) {
         .catch(() => { if (btn) btn.disabled = false; showToast('Koneksi gagal.', 'error'); });
     } else {
         // TAMBAH murid baru
-        window.apiFetch('api/students', {
+        fetch('api/students', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         })
+        .then(r => r.json())
         .then(res => {
             if (btn) btn.disabled = false;
             if (res.success) {
@@ -462,7 +465,8 @@ function deleteStudent(id) {
     const student = _studentsCache.find(x => (x._id && x._id.toString() === String(id)) || x.id === id);
     const name = student ? student.name : 'Murid ini';
     confirmDelete(`Hapus murid "${name}"? Aksi ini tidak bisa dibatalkan.`, () => {
-        window.apiFetch(`api/students?id=${id}`, { method: 'DELETE' })
+        fetch(`api/students?id=${id}`, { method: 'DELETE' })
+        .then(r => r.json())
         .then(res => {
             if (res.success) {
                 showToast('Murid berhasil dihapus.');
@@ -483,7 +487,8 @@ function loadStruktur() {
     const grid = document.getElementById('struktur-grid');
     grid.innerHTML = '<p class="col-span-full text-center text-gray-500 py-8">Memuat data...</p>';
 
-    window.apiFetch('api/struktur')
+    fetch('api/struktur')
+        .then(r => r.json())
         .then(res => {
             if (!res.success) throw new Error(res.message);
             _strukturCache = res.data;
@@ -614,11 +619,12 @@ document.getElementById('struktur-form').addEventListener('submit', function(e) 
     if (btn) btn.disabled = true;
 
     if (mongoId) {
-        window.apiFetch(`api/struktur?id=${mongoId}`, {
+        fetch(`api/struktur?id=${mongoId}`, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(data)
         })
+        .then(r => r.json())
         .then(res => {
             if (btn) btn.disabled = false;
             if (res.success) { showToast('Jabatan berhasil diperbarui!'); closeModal('struktur-modal'); loadStruktur(); }
@@ -626,11 +632,12 @@ document.getElementById('struktur-form').addEventListener('submit', function(e) 
         })
         .catch(() => { if (btn) btn.disabled = false; showToast('Koneksi gagal.', 'error'); });
     } else {
-        window.apiFetch('api/struktur', {
+        fetch('api/struktur', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(data)
         })
+        .then(r => r.json())
         .then(res => {
             if (btn) btn.disabled = false;
             if (res.success) { showToast('Jabatan berhasil ditambahkan!'); closeModal('struktur-modal'); loadStruktur(); }
@@ -643,7 +650,8 @@ document.getElementById('struktur-form').addEventListener('submit', function(e) 
 function deleteStruktur(id) {
     const s = _strukturCache.find(x => (x._id && x._id.toString() === String(id)) || x.id === id);
     confirmDelete(`Hapus "${s?.jabatan}" dari struktur?`, () => {
-        window.apiFetch(`api/struktur?id=${id}`, { method: 'DELETE' })
+        fetch(`api/struktur?id=${id}`, { method: 'DELETE' })
+        .then(r => r.json())
         .then(res => {
             if (res.success) { showToast('Jabatan berhasil dihapus.'); loadStruktur(); }
             else showToast(res.message || 'Gagal hapus.', 'error');
@@ -660,7 +668,8 @@ function loadProjects() {
     const grid = document.getElementById('projects-grid');
     grid.innerHTML = '<p class="col-span-full text-center text-gray-500 py-8">Memuat projek...</p>';
 
-    window.apiFetch('api/projects')
+    fetch('api/projects')
+        .then(r => r.json())
         .then(res => {
             if (!res.success) throw new Error(res.message);
             _projectsCache = res.data;
@@ -757,11 +766,12 @@ document.getElementById('project-form').addEventListener('submit', function(e) {
 
     if (mongoId) {
         // UPDATE
-        window.apiFetch(`api/projects?id=${mongoId}`, {
+        fetch(`api/projects?id=${mongoId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         })
+        .then(r => r.json())
         .then(res => {
             if (btn) btn.disabled = false;
             if (res.success) {
@@ -776,11 +786,12 @@ document.getElementById('project-form').addEventListener('submit', function(e) {
         .catch(() => { if (btn) btn.disabled = false; showToast('Koneksi gagal.', 'error'); });
     } else {
         // TAMBAH BARU
-        window.apiFetch('api/projects', {
+        fetch('api/projects', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         })
+        .then(r => r.json())
         .then(res => {
             if (btn) btn.disabled = false;
             if (res.success) {
@@ -799,7 +810,8 @@ document.getElementById('project-form').addEventListener('submit', function(e) {
 function deleteProject(id) {
     const p = _projectsCache.find(x => (x._id && x._id.toString() === String(id)) || x.id === id);
     confirmDelete(`Hapus projek "${p?.title}"?`, () => {
-        window.apiFetch(`api/projects?id=${id}`, { method: 'DELETE' })
+        fetch(`api/projects?id=${id}`, { method: 'DELETE' })
+        .then(r => r.json())
         .then(res => {
             if (res.success) {
                 showToast('Projek berhasil dihapus.');
@@ -821,7 +833,8 @@ function loadGallery() {
     const grid = document.getElementById('gallery-grid-admin');
     grid.innerHTML = '<p class="col-span-full text-center text-gray-500 py-8">Memuat gallery...</p>';
 
-    window.apiFetch('api/gallery')
+    fetch('api/gallery')
+        .then(r => r.json())
         .then(res => {
             if (!res.success) throw new Error(res.message);
             _galleryCache = res.data;
@@ -909,9 +922,10 @@ document.getElementById('gallery-form').addEventListener('submit', function(e) {
     if (btn) btn.disabled = true;
 
     if (mongoId) {
-        window.apiFetch(`api/gallery?id=${mongoId}`, {
+        fetch(`api/gallery?id=${mongoId}`, {
             method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
         })
+        .then(r => r.json())
         .then(res => {
             if (btn) btn.disabled = false;
             if (res.success) { showToast('Foto berhasil diperbarui!'); closeModal('gallery-modal'); loadGallery(); }
@@ -919,9 +933,10 @@ document.getElementById('gallery-form').addEventListener('submit', function(e) {
         })
         .catch(() => { if (btn) btn.disabled = false; showToast('Koneksi gagal.', 'error'); });
     } else {
-        window.apiFetch('api/gallery', {
+        fetch('api/gallery', {
             method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
         })
+        .then(r => r.json())
         .then(res => {
             if (btn) btn.disabled = false;
             if (res.success) { showToast('Foto berhasil ditambahkan!'); closeModal('gallery-modal'); loadGallery(); }
@@ -933,7 +948,8 @@ document.getElementById('gallery-form').addEventListener('submit', function(e) {
 
 function deleteGallery(id) {
     confirmDelete('Hapus foto ini dari gallery?', () => {
-        window.apiFetch(`api/gallery?id=${id}`, { method: 'DELETE' })
+        fetch(`api/gallery?id=${id}`, { method: 'DELETE' })
+        .then(r => r.json())
         .then(res => {
             if (res.success) { loadGallery(); showToast('Foto berhasil dihapus.'); }
             else showToast(res.message || 'Gagal hapus.', 'error');
@@ -947,7 +963,8 @@ function loadGuestbook() {
     const el = document.getElementById('guestbook-admin');
     el.innerHTML = '<p class="text-gray-500 text-sm italic text-center py-12">Memuat pesan...</p>';
 
-    window.apiFetch('api/guestbook')
+    fetch('api/guestbook')
+        .then(r => r.json())
         .then(res => {
             if (!res.success) throw new Error(res.message);
             const messages = res.data;
@@ -990,7 +1007,8 @@ function loadGuestbook() {
 }
 
 function deleteGuestbookMsg(id) {
-    window.apiFetch(`api/guestbook?id=${id}`, { method: 'DELETE' })
+    fetch(`api/guestbook?id=${id}`, { method: 'DELETE' })
+    .then(r => r.json())
     .then(res => {
         if (res.success) { loadGuestbook(); showToast('Pesan berhasil dihapus.'); }
         else showToast(res.message || 'Gagal hapus.', 'error');
@@ -1000,7 +1018,8 @@ function deleteGuestbookMsg(id) {
 
 function clearAllGuestbook() {
     confirmDelete('Hapus SEMUA pesan singkat? Tidak bisa dibatalkan!', () => {
-        window.apiFetch('api/guestbook?all=true', { method: 'DELETE' })
+        fetch('api/guestbook?all=true', { method: 'DELETE' })
+        .then(r => r.json())
         .then(res => {
             if (res.success) { loadGuestbook(); showToast('Semua pesan berhasil dihapus.'); }
             else showToast(res.message || 'Gagal hapus.', 'error');
@@ -1014,7 +1033,8 @@ function loadAccounts() {
     const el = document.getElementById('accounts-list');
     el.innerHTML = '<p class="text-gray-500 text-sm italic text-center py-8">Memuat akun murid...</p>';
 
-    window.apiFetch('api/students')
+    fetch('api/students')
+    .then(r => r.json())
     .then(res => {
         if (!res.success) throw new Error(res.message);
         const students = res.data;
@@ -1059,11 +1079,12 @@ function resetStudentPassword() {
     if (!username) return showToast('Masukkan username murid!', 'error');
     if (!newPw || newPw.length < 6) return showToast('Password minimal 6 karakter!', 'error');
 
-    window.apiFetch('api/auth', {
+    fetch('api/auth', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, newPassword: newPw })
     })
+    .then(r => r.json())
     .then(res => {
         if (res.success) {
             document.getElementById('reset-username').value = '';
@@ -1149,7 +1170,8 @@ let myCurrentPhotoData = null;
 function loadMyProfile() {
     if (window.CURRENT_ROLE !== 'student') return;
 
-    window.apiFetch('api/students')
+    fetch('api/students')
+        .then(res => res.json())
         .then(data => {
             if (data.success) {
                 // BUGFIX: Cari berdasarkan _id MongoDB (ObjectId string), bukan id numerik
@@ -1201,10 +1223,11 @@ function uploadMyPhoto(input) {
     formData.append('id', window.CURRENT_USER_ID);
     formData.append('photo', file);
 
-    window.apiFetch('api/upload', {
+    fetch('api/upload', {
         method: 'POST',
         body: formData
     })
+    .then(res => res.json())
     .then(data => {
         if(data.success) {
             document.getElementById('my-photo-preview').src = data.url;
@@ -1230,11 +1253,12 @@ function saveMyProfile(e) {
     // BUGFIX: Gunakan CURRENT_MONGO_ID (ObjectId) jika tersedia, fallback ke CURRENT_USER_ID
     const targetId = window.CURRENT_MONGO_ID || window.CURRENT_USER_ID;
 
-    window.apiFetch(`api/students?id=${targetId}`, {
+    fetch(`api/students?id=${targetId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     })
+    .then(res => res.json())
     .then(res => {
         if (res.success) {
             showToast('Profil berhasil disimpan!');
@@ -1247,7 +1271,8 @@ function saveMyProfile(e) {
 
 // ── MY SNAPSHOTS (STUDENT) ────────────────────────────────────
 function loadMySnapshots() {
-    window.apiFetch(`api/snapshots?student_id=${window.CURRENT_USER_ID}`)
+    fetch(`api/snapshots?student_id=${window.CURRENT_USER_ID}`)
+    .then(res => res.json())
     .then(res => {
         if(res.success) {
             renderMySnapshots(res.data);
@@ -1322,10 +1347,11 @@ function saveMySnapshot(e) {
     formData.append('caption', caption);
     formData.append('student_id', studentId);
 
-    window.apiFetch('api/snapshots', {
+    fetch('api/snapshots', {
         method: 'POST',
         body: formData
     })
+    .then(res => res.json())
     .then(res => {
         btn.disabled = false;
         btn.textContent = '📤 Upload';
@@ -1346,7 +1372,8 @@ function saveMySnapshot(e) {
 
 function deleteMySnapshot(id) {
     confirmDelete('Yakin hapus snapshot ini?', () => {
-        window.apiFetch(`api/snapshots?id=${id}`, { method: 'DELETE' })
+        fetch(`api/snapshots?id=${id}`, { method: 'DELETE' })
+        .then(res => res.json())
         .then(res => {
             if(res.success) {
                 showToast('Snapshot sukses dihapus!');

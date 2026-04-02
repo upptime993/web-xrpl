@@ -7,30 +7,22 @@ document.addEventListener('DOMContentLoaded', () => {
     let projectsData = [];
 
     // Ambil data: selalu dari MongoDB API (real-time), fallback ke data.json
-    // Ambil data: selalu dari MongoDB API
     async function loadData() {
         try {
-            // Fetch students dari MongoDB API
-            const studentJson = await window.apiFetch('api/students');
-            const galleryJson = await window.apiFetch('api/gallery');
+            // Fetch students dan gallery sekaligus dari MongoDB API (real-time)
+            const [studentRes, galleryRes] = await Promise.all([
+                fetch('api/students'),
+                fetch('api/gallery').catch(() => ({ json: () => ({ success: false }) }))
+            ]);
+            const studentJson = await studentRes.json();
+            const galleryJson = await galleryRes.json();
 
-            if (studentJson && studentJson.success && studentJson.data) {
-                
-                // 👇👇👇 TAMBAHKAN KODE ANTI-CRASH INI DI SINI 👇👇👇
-                if (studentJson.data.length === 0) {
-                    studentJson.data = [
-                        { _id: "dummy1", sort_order: 1, name: "Sistem Menunggu Data", jabatan: "Ketua Murid", color: "555555" },
-                        { _id: "dummy2", sort_order: 2, name: "Tambahkan Via Dashboard", jabatan: "Wakil Ketua", color: "555555" }
-                    ];
-                }
-                // 👆👆👆 --------------------------------------- 👆👆👆
-
+            if (studentJson.success && studentJson.data && studentJson.data.length > 0) {
                 // Map data MongoDB ke format yang dipakai app.js
                 studentsData = studentJson.data.map(s => ({
-                    id: s.sort_order || 1,
+                    id: s.sort_order || parseInt(s._id.toString().slice(-4), 16) % 100 || 1,
                     _id: s._id,
                     name: s.name || s.full_name,
-                    // ... kode kamu selanjutnya tidak perlu diubah ...
                     quote: s.quote || '',
                     motto: s.motto || '',
                     dream: s.dream || '',
@@ -38,34 +30,74 @@ document.addEventListener('DOMContentLoaded', () => {
                     photo: s.photo || null,
                     username: s.username || null
                 }));
-                window.setStudents(studentsData);
+
+                // Gallery dari MongoDB API (real-time), fallback ke data.json
+                if (galleryJson.success && galleryJson.data && galleryJson.data.length > 0) {
+                    galleryData = galleryJson.data;
+                } else {
+                    // Fallback ke data.json
+                    try {
+                        const fallback = await fetch('data.json');
+                        const fallbackData = await fallback.json();
+                        galleryData = fallbackData.gallery || [];
+                    } catch(e) { galleryData = []; }
+                }
+
+                // Projects dari MongoDB API (real-time), fallback ke localStorage
+                try {
+                    const projRes = await fetch('api/projects').catch(() => ({ json: () => ({ success: false }) }));
+                    const projJson = await projRes.json();
+                    if (projJson.success && projJson.data) {
+                        projectsData = projJson.data;
+                    } else {
+                        const lsProjects = localStorage.getItem('xrpl_projects_db');
+                        projectsData = lsProjects ? JSON.parse(lsProjects) : [];
+                    }
+                } catch(e) {
+                    const lsProjects = localStorage.getItem('xrpl_projects_db');
+                    projectsData = lsProjects ? JSON.parse(lsProjects) : [];
+                }
+
+                renderStudents();
+                renderGallery();
+                renderProjects();
+                updateCounterStats();
+                loadStrukturKelas();
+                hilangkanLoadingScreen();
+
+            } else {
+                // Fallback: fetch dari data.json jika MongoDB kosong atau belum di-setup
+                const response = await fetch('data.json');
+                if (!response.ok) throw new Error('Gagal memuat data');
+                const data = await response.json();
+                studentsData = data.students;
+                galleryData  = data.gallery;
+                projectsData = [];
+                renderStudents();
+                renderGallery();
+                updateCounterStats();
+                loadStrukturKelas();
+                hilangkanLoadingScreen();
             }
-
-            if (galleryJson && galleryJson.success && galleryJson.data) {
-                galleryData = galleryJson.data;
-                window.setGallery(galleryData);
-            }
-
-            const projJson = await window.apiFetch('api/projects');
-            if (projJson && projJson.success && projJson.data) {
-                projectsData = projJson.data;
-                window.setProjects(projectsData);
-            }
-
-            renderStudents();
-            renderGallery();
-            renderProjects();
-            updateCounterStats();
-            loadStrukturKelas();
-            if(window.hideLoader) window.hideLoader();
-
         } catch (error) {
             console.error("Error memuat data:", error);
-            if(window.hideLoader) window.hideLoader();
+            // Fallback ke localStorage jika semua gagal
+            try {
+                const lsStudents = localStorage.getItem('xrpl_students_db');
+                const lsGallery  = localStorage.getItem('xrpl_gallery_db');
+                if (lsStudents) studentsData = JSON.parse(lsStudents);
+                if (lsGallery)  galleryData  = JSON.parse(lsGallery);
+                if (studentsData.length > 0 || galleryData.length > 0) {
+                    renderStudents();
+                    renderGallery();
+                    hilangkanLoadingScreen();
+                    return;
+                }
+            } catch(e) {}
             document.getElementById('loading-screen').innerHTML = `
                 <div class="text-center">
                     <h1 class="text-white text-2xl mb-4">Oops! Gagal memuat data.</h1>
-                    <p class="text-text-secondary">Pastikan database terkoneksi dengan baik.</p>
+                    <p class="text-text-secondary">Pastikan kamu membukanya lewat Local Server (Live Server), bukan klik 2x file HTML-nya.</p>
                 </div>`;
         }
     }
@@ -173,7 +205,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function hilangkanLoadingScreen() {
-        if(window.hideLoader) window.hideLoader(); // delegate to ui.js
         const loadingScreen = document.getElementById('loading-screen');
         const loadingBar = document.getElementById('loading-bar');
         
@@ -196,37 +227,42 @@ document.addEventListener('DOMContentLoaded', () => {
         const emptyMsg = document.getElementById('gb-empty');
 
         // Load messages from MongoDB
-        const loadMessages = async () => {
-            const res = await window.apiFetch('api/guestbook');
-            if (!res || !res.success) return; // Silent error just like before
-
-            const messages = res.data;
-            if (messages.length === 0) {
-                emptyMsg.style.display = 'block';
-                return;
-            }
-            emptyMsg.style.display = 'none';
-            Array.from(list.children).forEach(child => { if (child.id !== 'gb-empty') child.remove(); });
-            messages.forEach(msg => {
-                const div = document.createElement('div');
-                div.className = 'ps-msg-card mb-3 animate-fade-in-up';
-                div.innerHTML = `
-                    <div class="flex items-start gap-3 pl-2">
-                        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyber-blue/30 to-electric-purple/30 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">${(msg.name||'?')[0].toUpperCase()}</div>
-                        <div class="flex-1 min-w-0">
-                            <div class="flex items-baseline gap-2 flex-wrap mb-1">
-                                <span class="text-white text-sm font-semibold">${msg.name}</span>
-                                <span class="text-white/30 text-[10px]">${msg.date}</span>
+        const loadMessages = () => {
+            fetch('api/guestbook')
+            .then(r => r.json())
+            .then(res => {
+                if (!res.success) throw new Error(res.message);
+                const messages = res.data;
+                if (messages.length === 0) {
+                    emptyMsg.style.display = 'block';
+                    return;
+                }
+                emptyMsg.style.display = 'none';
+                Array.from(list.children).forEach(child => { if (child.id !== 'gb-empty') child.remove(); });
+                messages.forEach(msg => {
+                    const div = document.createElement('div');
+                    div.className = 'ps-msg-card mb-3 animate-fade-in-up';
+                    div.innerHTML = `
+                        <div class="flex items-start gap-3 pl-2">
+                            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyber-blue/30 to-electric-purple/30 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">${(msg.name||'?')[0].toUpperCase()}</div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-baseline gap-2 flex-wrap mb-1">
+                                    <span class="text-white text-sm font-semibold">${msg.name}</span>
+                                    <span class="text-white/30 text-[10px]">${msg.date}</span>
+                                </div>
+                                <p class="text-text-secondary text-sm break-words leading-relaxed">${msg.text}</p>
                             </div>
-                            <p class="text-text-secondary text-sm break-words leading-relaxed">${msg.text}</p>
                         </div>
-                    </div>
-                `;
-                list.appendChild(div);
+                    `;
+                    list.appendChild(div);
+                });
+            })
+            .catch(() => {
+                // Tetap tampilkan form walau gagal load
             });
         };
 
-        form.addEventListener('submit', async (e) => {
+        form.addEventListener('submit', (e) => {
             e.preventDefault();
             const nameInput = document.getElementById('gb-name');
             const msgInput = document.getElementById('gb-message');
@@ -235,22 +271,40 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!nameInput.value.trim() || !msgInput.value.trim()) return;
             
             if (btn) btn.disabled = true;
+            if (window.showLoader) window.showLoader();
 
-            const payload = { name: nameInput.value.trim(), text: msgInput.value.trim() };
-            const res = await window.apiFetch('api/guestbook', {
+            fetch('api/guestbook', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({ name: nameInput.value.trim(), text: msgInput.value.trim() })
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (window.hideLoader) window.hideLoader();
+                if (btn) btn.disabled = false;
+                if (res.success) {
+                    nameInput.value = '';
+                    msgInput.value = '';
+                    loadMessages();
+                    
+                    // Show a quick custom toast on success
+                    const toast = document.createElement('div');
+                    toast.className = 'fixed bottom-4 right-4 bg-neon-green/20 border border-neon-green text-neon-green px-4 py-2 rounded-lg text-sm z-50 animate-fade-in-up';
+                    toast.innerHTML = '✅ Pesan berhasil dikirim!';
+                    document.body.appendChild(toast);
+                    setTimeout(() => {
+                        toast.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+                        setTimeout(() => toast.remove(), 300);
+                    }, 3000);
+                } else {
+                    alert(res.message || 'Gagal kirim pesan.');
+                }
+            })
+            .catch(() => {
+                if (window.hideLoader) window.hideLoader();
+                if (btn) btn.disabled = false;
+                alert('Gagal koneksi ke server.');
             });
-
-            if (btn) btn.disabled = false;
-
-            if (res && res.success) {
-                nameInput.value = '';
-                msgInput.value = '';
-                loadMessages();
-                if(window.showToast) window.showToast('Pesan berhasil dikirim!', 'success');
-            }
         });
 
         loadMessages();
@@ -487,12 +541,13 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('modal-img').src = avatarUrl;
         document.getElementById('modal-img').style.borderColor = `#${s.color}`;
 
-        document.getElementById('modal-gallery').innerHTML = '<div class="col-span-3 text-center py-4"><span class="text-white text-sm animate-pulse">Memuat foto...</span></div>';
+        document.getElementById('modal-gallery').innerHTML = '<div class="col-span-3 text-center py-4"><span class="text-white text-sm animate-pulse">Memuat gallery...</span></div>';
 
-        window.apiFetch(`api/snapshots?student_id=${s._id}`)
+        fetch(`api/snapshots?student_id=${s._id}`)
+            .then(res => res.json())
             .then(data => {
                 let miniGalleryHTML = '';
-                if (data && data.success && data.data.length > 0) {
+                if (data.success && data.data.length > 0) {
                     window._currentSnaps = window._currentSnaps || {};
                     window._currentSnaps[s._id] = data.data;
 
@@ -514,8 +569,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 document.getElementById('modal-gallery').innerHTML = miniGalleryHTML;
                 document.querySelectorAll('.snap-thumb').forEach(el => {
+                    // Update: dataset returns string, lightbox uses string ID now
                     el.addEventListener('click', () => window.openSnapLightbox(el.dataset.snapId, el.dataset.studentId));
                 });
+            })
+            .catch(() => {
+                document.getElementById('modal-gallery').innerHTML = '<div class="col-span-3 text-center py-4 text-gray-500 text-xs text-red-400">Gagal mengambil foto. Pastikan koneksi server nyala.</div>';
             });
 
         lastFocusedElement = document.activeElement;
@@ -758,25 +817,27 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('snap-lb-close').addEventListener('click', closeSnapLightbox);
     document.getElementById('snap-lb-overlay').addEventListener('click', closeSnapLightbox);
 
-    document.getElementById('snap-lb-like-btn').addEventListener('click', async () => {
+    document.getElementById('snap-lb-like-btn').addEventListener('click', () => {
         if (!currentSnapId) return;
         
-        const data = await window.apiFetch('api/snapshots?action=like', {
+        fetch('api/snapshots?action=like', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ snapshot_id: currentSnapId })
-        });
-
-        if (data && data.success) {
-            if (data.action === 'liked') {
-                window._currentSnapData.likesCount++;
-                window._currentSnapData.userLiked = true;
-            } else {
-                window._currentSnapData.likesCount = Math.max(0, window._currentSnapData.likesCount - 1);
-                window._currentSnapData.userLiked = false;
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                if (data.action === 'liked') {
+                    window._currentSnapData.likesCount++;
+                    window._currentSnapData.userLiked = true;
+                } else {
+                    window._currentSnapData.likesCount = Math.max(0, window._currentSnapData.likesCount - 1);
+                    window._currentSnapData.userLiked = false;
+                }
+                renderSnapInteractions();
             }
-            renderSnapInteractions();
-        }
+        });
     });
 
     document.getElementById('snap-lb-download-btn').addEventListener('click', () => {
@@ -800,7 +861,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(() => alert('Gagal mendownload foto'));
     });
 
-    document.getElementById('snap-lb-form').addEventListener('submit', async (e) => {
+    document.getElementById('snap-lb-form').addEventListener('submit', (e) => {
         e.preventDefault();
         if (!currentSnapId) return;
         const name = document.getElementById('snap-lb-name').value.trim();
@@ -810,21 +871,29 @@ document.addEventListener('DOMContentLoaded', () => {
         const btn = e.target.querySelector('button[type="submit"]');
         btn.disabled = true;
 
-        const data = await window.apiFetch('api/snapshots?action=comment', {
+        fetch('api/snapshots?action=comment', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ snapshot_id: currentSnapId, name, text })
+        })
+        .then(res => res.json())
+        .then(data => {
+            btn.disabled = false;
+            if (data.success) {
+                // Tambahkan langsung secara lokal untuk real-time feel
+                if (!window._currentSnapData.comments) window._currentSnapData.comments = [];
+                window._currentSnapData.comments.push({ name, text, date: 'Baru saja' });
+                
+                document.getElementById('snap-lb-txt').value = '';
+                renderSnapInteractions();
+            } else {
+                alert(data.message || 'Gagal mengirim komentar');
+            }
+        })
+        .catch(() => {
+            btn.disabled = false;
+            alert('Gagal koneksi server');
         });
-
-        btn.disabled = false;
-        if (data && data.success) {
-            // Tambahkan langsung secara lokal untuk real-time feel
-            if (!window._currentSnapData.comments) window._currentSnapData.comments = [];
-            window._currentSnapData.comments.push({ name, text, date: 'Baru saja' });
-            
-            document.getElementById('snap-lb-txt').value = '';
-            renderSnapInteractions();
-        }
     });
 
     // ==========================================
