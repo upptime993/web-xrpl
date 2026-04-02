@@ -83,7 +83,11 @@ export default async function handler(req, res) {
             }
 
             const hashedPassword = bcrypt.hashSync('murid123', 10);
-            const lastStudent = await collection.findOne({}, { sort: { sort_order: -1 } });
+            // Only count active students for sort_order to avoid gaps from deleted ones
+            const lastStudent = await collection.findOne(
+                { is_active: { $ne: 0 } },
+                { sort: { sort_order: -1 } }
+            );
             const nextSortOrder = sort_order || (lastStudent ? (lastStudent.sort_order || 0) + 1 : 1);
 
             const newStudent = {
