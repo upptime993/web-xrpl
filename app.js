@@ -6,27 +6,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let galleryData = [];
     let projectsData = [];
 
-    // Ambil data: paralel fetch untuk kecepatan maksimal
+    // Ambil data: selalu dari MongoDB API (real-time), fallback ke data.json
+    // Ambil data: selalu dari MongoDB API
     async function loadData() {
-        // Jalankan loading bar animasi
-        const loadingBar = document.getElementById('loading-bar');
-        if (loadingBar) setTimeout(() => { loadingBar.style.width = '70%'; }, 50);
-
-        // Timeout helper: kalau API > 8 detik, anggap gagal
-        const fetchWithTimeout = (url, ms = 8000) => {
-            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms));
-            return Promise.race([window.apiFetch(url), timeout]);
-        };
-
         try {
-            // Fetch semua API secara PARALEL (bukan satu-satu)
-            const [studentJson, galleryJson, projJson] = await Promise.all([
-                fetchWithTimeout('api/students'),
-                fetchWithTimeout('api/gallery'),
-                fetchWithTimeout('api/projects'),
-            ]);
+            // Fetch students dari MongoDB API
+            const studentJson = await window.apiFetch('api/students');
+            const galleryJson = await window.apiFetch('api/gallery');
 
             if (studentJson && studentJson.success && studentJson.data) {
+                // Map data MongoDB ke format yang dipakai app.js
                 studentsData = studentJson.data.map(s => ({
                     id: s.sort_order || 1,
                     _id: s._id,
@@ -46,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.setGallery(galleryData);
             }
 
+            const projJson = await window.apiFetch('api/projects');
             if (projJson && projJson.success && projJson.data) {
                 projectsData = projJson.data;
                 window.setProjects(projectsData);
@@ -56,21 +46,16 @@ document.addEventListener('DOMContentLoaded', () => {
             renderProjects();
             updateCounterStats();
             loadStrukturKelas();
+            if(window.hideLoader) window.hideLoader();
 
         } catch (error) {
             console.error("Error memuat data:", error);
-        } finally {
-            // Loading screen SELALU hilang, berhasil atau gagal
-            if (loadingBar) loadingBar.style.width = '100%';
-            const loadingScreen = document.getElementById('loading-screen');
-            if (loadingScreen) {
-                setTimeout(() => {
-                    loadingScreen.style.opacity = '0';
-                    loadingScreen.style.transition = 'opacity 0.5s';
-                    setTimeout(() => { loadingScreen.style.display = 'none'; }, 500);
-                }, 300);
-            }
             if(window.hideLoader) window.hideLoader();
+            document.getElementById('loading-screen').innerHTML = `
+                <div class="text-center">
+                    <h1 class="text-white text-2xl mb-4">Oops! Gagal memuat data.</h1>
+                    <p class="text-text-secondary">Pastikan database terkoneksi dengan baik.</p>
+                </div>`;
         }
     }
 
