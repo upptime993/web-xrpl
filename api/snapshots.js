@@ -130,9 +130,9 @@ export default async function handler(req, res) {
             }
             const buffer = Buffer.concat(chunks);
 
-            // Check size limit (5MB)
-            if (buffer.length > 5 * 1024 * 1024) {
-                return sendError(res, 'File terlalu besar. Maksimal 5MB.', 400);
+            // Check size limit (10MB — client sudah compress ke ~5MB)
+            if (buffer.length > 10 * 1024 * 1024) {
+                return sendError(res, 'File terlalu besar. Maksimal 10MB.', 400);
             }
 
             const contentType = req.headers['content-type'] || '';

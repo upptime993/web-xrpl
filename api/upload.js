@@ -16,12 +16,12 @@ export default async function handler(req, res) {
     const user = requireAuth(req, res);
     if (!user) return;
 
-    const form = new multiparty.Form({ maxFilesSize: 5 * 1024 * 1024 }); // 5MB limit
+    const form = new multiparty.Form({ maxFilesSize: 10 * 1024 * 1024 }); // 10MB limit (client sudah compress ke ~5MB)
 
     form.parse(req, async (err, fields, files) => {
         if (err) {
             if (err.code === 'ETOOBIG') {
-                return sendError(res, 'File terlalu besar. Maksimal 5MB.', 400);
+                return sendError(res, 'File terlalu besar. Maksimal 10MB.', 400);
             }
             return sendError(res, 'Gagal membaca file: ' + err.message, 400);
         }

@@ -12,7 +12,7 @@ cloudinary.config({
 
 // Tipe file yang diizinkan
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB (client sudah compress ke ~5MB)
 
 /**
  * Upload gambar ke Cloudinary dari base64 string
@@ -57,7 +57,7 @@ export async function uploadToCloudinary(base64Data, folder = 'xrpl') {
         if (estimatedSize > MAX_FILE_SIZE) {
             return {
                 success: false,
-                message: `File terlalu besar (${(estimatedSize / 1024 / 1024).toFixed(1)}MB). Maksimal 5MB.`
+                message: `File terlalu besar (${(estimatedSize / 1024 / 1024).toFixed(1)}MB). Maksimal 10MB.`
             };
         }
 
@@ -128,7 +128,7 @@ export function validateFileUpload(file) {
     if (file.size > MAX_FILE_SIZE) {
         return {
             valid: false,
-            message: `File terlalu besar (${(file.size / 1024 / 1024).toFixed(1)}MB). Maksimal 5MB.`
+            message: `File terlalu besar (${(file.size / 1024 / 1024).toFixed(1)}MB). Maksimal 10MB.`
         };
     }
 
