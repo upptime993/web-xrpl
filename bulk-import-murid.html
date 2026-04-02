@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Import Murid Bulk | X RPL</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root {
+    --blue: #00d4ff;
+    --purple: #7b2ff7;
+    --green: #00ff88;
+    --bg: #0a0a0f;
+    --card: rgba(255,255,255,0.04);
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); font-family: 'Poppins', sans-serif; color: #fff; min-height: 100vh; }
+  
+  .glass { background: rgba(255,255,255,0.04); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.09); }
+  
+  textarea {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: #fff;
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.875rem;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  textarea:focus { border-color: var(--blue); }
+  textarea::placeholder { color: #4b5563; }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--blue), var(--purple));
+    border: none; color: #fff; font-family: 'Poppins', sans-serif;
+    font-weight: 700; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,212,255,0.3); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .btn-ghost {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+    color: #9ca3af; font-family: 'Poppins', sans-serif; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-ghost:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
+  /* Table */
+  .preview-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  .preview-table th { 
+    text-align: left; padding: 10px 12px; 
+    color: #6b7280; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+  .preview-table td { padding: 9px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; }
+  .preview-table tr:hover td { background: rgba(255,255,255,0.03); }
+
+  /* Status badges */
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px; font-size: 0.7rem; font-weight: 600; }
+  .badge-wait  { background: rgba(107,114,128,0.2); color: #9ca3af; }
+  .badge-ok    { background: rgba(0,255,136,0.15); color: var(--green); }
+  .badge-err   { background: rgba(239,68,68,0.15); color: #fca5a5; }
+  .badge-skip  { background: rgba(251,191,36,0.15); color: #fbbf24; }
+
+  /* Progress bar */
+  .prog-bar { height: 6px; background: rgba(255,255,255,0.07); border-radius: 99px; overflow: hidden; }
+  .prog-fill { height: 100%; background: linear-gradient(90deg, var(--blue), var(--purple)); border-radius: 99px; transition: width 0.3s; }
+
+  /* Glow heading */
+  .logo-text { font-family: 'Orbitron', sans-serif; background: linear-gradient(135deg, var(--blue), var(--purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+  /* Row number */
+  .row-num { color: #374151; font-size: 0.7rem; font-family: monospace; }
+
+  /* Avatar chip */
+  .avatar-chip { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; flex-shrink: 0; }
+
+  /* Log area */
+  #log-area { font-family: monospace; font-size: 0.75rem; line-height: 1.8; max-height: 220px; overflow-y: auto; }
+  #log-area::-webkit-scrollbar { width: 4px; }
+  #log-area::-webkit-scrollbar-thumb { background: var(--purple); border-radius: 2px; }
+
+  /* Scrollbar global */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: linear-gradient(var(--blue), var(--purple)); border-radius: 3px; }
+
+  /* Pulse dot */
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .pulse { animation: pulse 1.2s ease-in-out infinite; }
+
+  /* Fade in */
+  @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+  .fade-up { animation: fadeUp 0.5s ease-out forwards; }
+
+  /* Input field */
+  .input-sm {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+    color: #fff; font-family: 'Poppins', sans-serif; font-size: 0.8rem;
+    padding: 6px 10px; border-radius: 8px; outline: none; transition: border-color 0.2s;
+  }
+  .input-sm:focus { border-color: var(--blue); }
+
+  /* Toast */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+    background: rgba(15,15,25,0.95); border: 1px solid rgba(255,255,255,0.1);
+    backdrop-filter: blur(12px); border-radius: 12px; padding: 12px 18px;
+    font-size: 0.85rem; display: flex; align-items: center; gap-8px;
+    transform: translateY(80px); opacity: 0; transition: all 0.3s;
+    pointer-events: none;
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+
+  .color-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+  td input[type="text"] {
+    background: transparent; border: none; border-bottom: 1px solid rgba(255,255,255,0.1);
+    color: #fff; font-family: 'Poppins', sans-serif; font-size: 0.8rem;
+    padding: 2px 4px; outline: none; width: 100%; transition: border-color 0.2s;
+  }
+  td input[type="text"]:focus { border-color: var(--blue); }
+</style>
+</head>
+<body>
+
+<div id="toast">⚡ <span id="toast-msg"></span></div>
+
+<!-- Background blobs -->
+<div style="position:fixed;top:-15%;left:-10%;width:400px;height:400px;background:rgba(0,212,255,0.07);border-radius:50%;filter:blur(80px);pointer-events:none;z-index:0"></div>
+<div style="position:fixed;bottom:-15%;right:-10%;width:400px;height:400px;background:rgba(123,47,247,0.07);border-radius:50%;filter:blur(80px);pointer-events:none;z-index:0"></div>
+
+<div class="relative z-10 max-w-5xl mx-auto px-4 py-10 fade-up">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-8">
+    <div>
+      <div class="logo-text text-2xl font-black mb-1">&lt;X_RPL/&gt;</div>
+      <h1 class="text-white text-xl font-bold">Import Murid Massal</h1>
+      <p class="text-gray-500 text-sm mt-0.5">Tambah banyak murid sekaligus dari daftar nama</p>
+    </div>
+    <a href="dashboard.html" class="btn-ghost text-sm px-4 py-2 rounded-xl">← Dashboard</a>
+  </div>
+
+  <!-- Step 1: Paste nama -->
+  <div class="glass rounded-2xl p-6 mb-4" id="step-paste">
+    <div class="flex items-center gap-3 mb-4">
+      <div style="width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--blue),var(--purple));display:flex;align-items:center;justify-content:center;font-size:0.85rem;font-weight:700;flex-shrink:0">1</div>
+      <div>
+        <div class="font-semibold text-white">Paste Daftar Nama</div>
+        <div class="text-gray-500 text-xs">Satu nama per baris — huruf besar/kecil otomatis dirapikan</div>
+      </div>
+    </div>
+
+    <textarea id="names-input" rows="12" class="w-full rounded-xl p-4" placeholder="Contoh:
+A.muharom iqbal
+Adutia yulianto
+Agra maulana satriani
+..."></textarea>
+
+    <div class="flex items-center gap-3 mt-3 flex-wrap">
+      <button onclick="pasteFromClipboard()" class="btn-ghost text-xs px-4 py-2 rounded-lg">📋 Paste dari Clipboard</button>
+      <button onclick="loadSampleData()" class="btn-ghost text-xs px-4 py-2 rounded-lg">🧪 Pakai Data Contoh</button>
+      <div class="ml-auto flex items-center gap-2">
+        <span class="text-gray-500 text-xs">Password default:</span>
+        <input type="text" id="default-pw" class="input-sm w-28" value="murid123" placeholder="murid123">
+      </div>
+      <button onclick="parseNames()" class="btn-primary text-sm px-6 py-2.5 rounded-xl">
+        Parse & Preview →
+      </button>
+    </div>
+  </div>
+
+  <!-- Step 2: Preview & Edit -->
+  <div class="glass rounded-2xl p-6 mb-4 hidden" id="step-preview">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-3">
+        <div style="width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--blue),var(--purple));display:flex;align-items:center;justify-content:center;font-size:0.85rem;font-weight:700;flex-shrink:0">2</div>
+        <div>
+          <div class="font-semibold text-white">Preview & Koreksi</div>
+          <div class="text-gray-500 text-xs">Edit nama/username sebelum dikirim</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span id="count-badge" class="badge badge-wait">0 murid</span>
+        <button onclick="document.getElementById('step-preview').classList.add('hidden');document.getElementById('step-paste').classList.remove('hidden')" class="btn-ghost text-xs px-3 py-1.5 rounded-lg">← Edit Ulang</button>
+      </div>
+    </div>
+
+    <!-- Stats row -->
+    <div class="grid grid-cols-3 gap-3 mb-4" id="stats-row">
+      <div class="rounded-xl p-3" style="background:rgba(0,255,136,0.07);border:1px solid rgba(0,255,136,0.15)">
+        <div class="text-green-400 text-lg font-bold" id="stat-total">0</div>
+        <div class="text-gray-500 text-xs">Total Murid</div>
+      </div>
+      <div class="rounded-xl p-3" style="background:rgba(0,212,255,0.07);border:1px solid rgba(0,212,255,0.15)">
+        <div class="text-cyan-400 text-lg font-bold" id="stat-unique">0</div>
+        <div class="text-gray-500 text-xs">Username Unik</div>
+      </div>
+      <div class="rounded-xl p-3" style="background:rgba(251,191,36,0.07);border:1px solid rgba(251,191,36,0.15)">
+        <div class="text-yellow-400 text-lg font-bold" id="stat-dup">0</div>
+        <div class="text-gray-500 text-xs">Duplikat</div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div style="overflow-x:auto;border-radius:12px;border:1px solid rgba(255,255,255,0.06)">
+      <table class="preview-table">
+        <thead>
+          <tr>
+            <th style="width:36px">#</th>
+            <th>Nama Lengkap</th>
+            <th>Username</th>
+            <th>Password</th>
+            <th style="width:80px">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="preview-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="flex justify-between items-center mt-4">
+      <label class="flex items-center gap-2 text-xs text-gray-400 cursor-pointer">
+        <input type="checkbox" id="skip-dup" class="rounded" style="accent-color:var(--blue)"> Lewati duplikat username
+      </label>
+      <button onclick="startImport()" class="btn-primary text-sm px-8 py-3 rounded-xl">
+        🚀 Import Sekarang
+      </button>
+    </div>
+  </div>
+
+  <!-- Step 3: Progress -->
+  <div class="glass rounded-2xl p-6 hidden" id="step-progress">
+    <div class="flex items-center gap-3 mb-5">
+      <div style="width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--blue),var(--purple));display:flex;align-items:center;justify-content:center;font-size:0.85rem;font-weight:700;flex-shrink:0">3</div>
+      <div>
+        <div class="font-semibold text-white">Proses Import</div>
+        <div class="text-gray-500 text-xs" id="prog-subtitle">Mengirim data ke server...</div>
+      </div>
+    </div>
+
+    <!-- Progress bar -->
+    <div class="prog-bar mb-2">
+      <div class="prog-fill" id="prog-fill" style="width:0%"></div>
+    </div>
+    <div class="flex justify-between text-xs text-gray-500 mb-4">
+      <span id="prog-text">0 / 0</span>
+      <span id="prog-pct">0%</span>
+    </div>
+
+    <!-- Summary chips -->
+    <div class="flex gap-3 mb-4 flex-wrap">
+      <div class="badge badge-ok" id="chip-ok">✅ 0 berhasil</div>
+      <div class="badge badge-err" id="chip-err">❌ 0 gagal</div>
+      <div class="badge badge-skip" id="chip-skip">⏭️ 0 dilewati</div>
+    </div>
+
+    <!-- Log -->
+    <div class="rounded-xl p-4 mb-4" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06)">
+      <div id="log-area"></div>
+    </div>
+
+    <div class="flex gap-3 hidden" id="done-actions">
+      <button onclick="location.href='dashboard.html#students'" class="btn-primary text-sm px-6 py-2.5 rounded-xl">
+        👥 Lihat Data Murid
+      </button>
+      <button onclick="resetTool()" class="btn-ghost text-sm px-6 py-2.5 rounded-xl">
+        ↩ Import Lagi
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────
+let students = [];
+const COLORS = ['7b2ff7','00d4ff','00ff88','ff6b6b','ffd93d','ff8c42','a8dadc','e63946','457b9d','2dc653'];
+
+// ─── Utilities ───────────────────────────────────────────────
+function toTitleCase(str) {
+  return str.replace(/\b\w/g, c => c.toUpperCase()).replace(/\b(M|m)\.\s*/g, (_, m) => m.toUpperCase() + '. ');
+}
+
+function toUsername(name) {
+  // Normalize: lowercase, replace spasi dengan titik, hapus karakter aneh
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/\./g, '') // hapus titik dulu (M.)
+    .replace(/\s+/g, '.') // spasi → titik
+    .replace(/[^a-z0-9.]/g, '') // hapus karakter non-alfanumerik kecuali titik
+    .replace(/\.+/g, '.') // multiple titik → satu
+    .replace(/^\.+|\.+$/g, ''); // trim titik di awal/akhir
+}
+
+function randColor() {
+  return COLORS[Math.floor(Math.random() * COLORS.length)];
+}
+
+function showToast(msg, dur = 3000) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+
+// ─── Step 1: Parse ───────────────────────────────────────────
+function loadSampleData() {
+  document.getElementById('names-input').value = `A.muharom iqbal
+Adutia yulianto
+Agra maulana satriani
+Dava nugraha saputra
+Egi maulana saputra
+Eka satria priyanto
+Fachry genta saputra
+Fatih farhan arrohman
+Hababil suhada putra
+Hafid ahmad yusril
+Hamiyah sari
+Ikbal sahril ramadhan
+iksan
+Manda ramadhanti
+Maulana rosadi
+M. aji rahmat
+M. adrian
+M. fahmi fahreza
+M. faujan
+M. tegar
+M.dhuha haidar ahkam
+M fahmi aji
+Muhammad firdaus
+muhammad surya
+muhammad yusuf
+Nurfadilah
+Rahma sintia
+Ridho hidayat
+Safira maharani
+Sefani livia
+sopiyah
+Syafik
+Virly putri
+Yasmin nuraini
+Zaskia nurfitriani
+Saskiah`;
+}
+
+async function pasteFromClipboard() {
+  try {
+    const text = await navigator.clipboard.readText();
+    document.getElementById('names-input').value = text;
+    showToast('📋 Berhasil paste dari clipboard!');
+  } catch {
+    showToast('Izin clipboard ditolak. Paste manual ya!');
+  }
+}
+
+function parseNames() {
+  const raw = document.getElementById('names-input').value;
+  const pw = document.getElementById('default-pw').value.trim() || 'murid123';
+  const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 1);
+  
+  if (lines.length === 0) {
+    showToast('⚠️ Belum ada nama yang diinput!');
+    return;
+  }
+
+  const usernameCount = {};
+  students = lines.map((line, i) => {
+    const name = toTitleCase(line);
+    let username = toUsername(line);
+    
+    // Handle duplikat username
+    usernameCount[username] = (usernameCount[username] || 0) + 1;
+    const isDup = usernameCount[username] > 1;
+    const displayUsername = isDup ? username + usernameCount[username] : username;
+    
+    return {
+      id: i,
+      name,
+      username: displayUsername,
+      baseUsername: username,
+      password: pw,
+      color: randColor(),
+      isDup,
+      status: 'wait' // wait | ok | err | skip
+    };
+  });
+
+  renderPreview();
+  document.getElementById('step-paste').classList.add('hidden');
+  document.getElementById('step-preview').classList.remove('hidden');
+}
+
+// ─── Step 2: Preview ─────────────────────────────────────────
+function renderPreview() {
+  const tbody = document.getElementById('preview-tbody');
+  const dups = students.filter(s => s.isDup).length;
+  const unique = students.length - dups;
+
+  document.getElementById('stat-total').textContent = students.length;
+  document.getElementById('stat-unique').textContent = unique;
+  document.getElementById('stat-dup').textContent = dups;
+  document.getElementById('count-badge').textContent = students.length + ' murid';
+
+  tbody.innerHTML = students.map(s => {
+    const initial = s.name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
+    return `
+    <tr id="row-${s.id}">
+      <td class="row-num">${s.id + 1}</td>
+      <td>
+        <div class="flex items-center gap-2">
+          <div class="avatar-chip" style="background:#${s.color}">${initial}</div>
+          <input type="text" value="${s.name}" onchange="updateStudent(${s.id},'name',this.value)" style="max-width:180px">
+        </div>
+      </td>
+      <td>
+        <input type="text" value="${s.username}" onchange="updateStudent(${s.id},'username',this.value)" style="max-width:160px;font-family:monospace">
+        ${s.isDup ? '<span class="badge badge-skip ml-1">dup</span>' : ''}
+      </td>
+      <td>
+        <input type="text" value="${s.password}" onchange="updateStudent(${s.id},'password',this.value)" style="max-width:110px">
+      </td>
+      <td>
+        <button onclick="removeStudent(${s.id})" class="text-red-400 hover:text-red-300 text-lg transition-colors" title="Hapus">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function updateStudent(id, field, val) {
+  const s = students.find(x => x.id === id);
+  if (s) s[field] = val.trim();
+}
+
+function removeStudent(id) {
+  students = students.filter(s => s.id !== id);
+  if (students.length === 0) {
+    document.getElementById('step-preview').classList.add('hidden');
+    document.getElementById('step-paste').classList.remove('hidden');
+    return;
+  }
+  renderPreview();
+  showToast('Murid dihapus dari daftar');
+}
+
+// ─── Step 3: Import ──────────────────────────────────────────
+let importRunning = false;
+
+async function startImport() {
+  if (importRunning) return;
+  importRunning = true;
+
+  const skipDup = document.getElementById('skip-dup').checked;
+  const list = skipDup ? students.filter(s => !s.isDup) : students;
+
+  if (list.length === 0) {
+    showToast('⚠️ Tidak ada murid yang akan diimport!');
+    importRunning = false;
+    return;
+  }
+
+  document.getElementById('step-preview').classList.add('hidden');
+  document.getElementById('step-progress').classList.remove('hidden');
+
+  const logArea = document.getElementById('log-area');
+  logArea.innerHTML = '';
+
+  let ok = 0, err = 0, skip = 0;
+  const total = list.length;
+
+  function updateUI() {
+    const done = ok + err + skip;
+    const pct = Math.round((done / total) * 100);
+    document.getElementById('prog-fill').style.width = pct + '%';
+    document.getElementById('prog-text').textContent = `${done} / ${total}`;
+    document.getElementById('prog-pct').textContent = pct + '%';
+    document.getElementById('chip-ok').textContent = `✅ ${ok} berhasil`;
+    document.getElementById('chip-err').textContent = `❌ ${err} gagal`;
+    document.getElementById('chip-skip').textContent = `⏭️ ${skip} dilewati`;
+    document.getElementById('prog-subtitle').textContent = done < total ? `Mengirim ${done + 1} dari ${total}...` : 'Selesai!';
+  }
+
+  function log(msg, color = '#9ca3af') {
+    const line = document.createElement('div');
+    line.style.color = color;
+    line.textContent = msg;
+    logArea.appendChild(line);
+    logArea.scrollTop = logArea.scrollHeight;
+  }
+
+  for (const s of list) {
+    const payload = {
+      name: s.name,
+      username: s.username,
+      password: s.password,
+      color: s.color,
+      dream: '',
+      motto: '',
+      quote: ''
+    };
+
+    try {
+      const res = await fetch('api/students', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success !== false) {
+        ok++;
+        log(`✅ ${s.name} (@${s.username})`, '#6ee7b7');
+      } else {
+        const msg = data.message || `HTTP ${res.status}`;
+        if (msg.toLowerCase().includes('duplik') || msg.toLowerCase().includes('exist') || msg.toLowerCase().includes('already')) {
+          skip++;
+          log(`⏭️ ${s.name} — sudah ada (${msg})`, '#fbbf24');
+        } else {
+          err++;
+          log(`❌ ${s.name} — ${msg}`, '#fca5a5');
+        }
+      }
+    } catch (e) {
+      err++;
+      log(`❌ ${s.name} — koneksi error: ${e.message}`, '#fca5a5');
+    }
+
+    updateUI();
+
+    // Jeda kecil biar tidak spam server
+    await new Promise(r => setTimeout(r, 180));
+  }
+
+  // Done
+  importRunning = false;
+  document.getElementById('done-actions').classList.remove('hidden');
+  document.getElementById('prog-subtitle').textContent = `Import selesai! ${ok} murid berhasil ditambahkan.`;
+  
+  if (err === 0) {
+    log(`\n🎉 Semua selesai! ${ok} murid berhasil diimport.`, '#00ff88');
+  } else {
+    log(`\n⚠️ Selesai dengan ${err} error. Cek log di atas.`, '#fbbf24');
+  }
+
+  showToast(`Import selesai: ${ok} berhasil, ${err} gagal`, 5000);
+}
+
+function resetTool() {
+  students = [];
+  importRunning = false;
+  document.getElementById('names-input').value = '';
+  document.getElementById('log-area').innerHTML = '';
+  document.getElementById('done-actions').classList.add('hidden');
+  document.getElementById('prog-fill').style.width = '0%';
+  document.getElementById('step-progress').classList.add('hidden');
+  document.getElementById('step-paste').classList.remove('hidden');
+}
+</script>
+</body>
+</html>
