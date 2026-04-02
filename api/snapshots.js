@@ -1,5 +1,7 @@
 import getDB from './_db.js';
 import { ObjectId } from 'mongodb';
+import { verifyAuth } from './_auth.js';
+import { uploadToCloudinary } from './_cloudinary.js';
 
 // Matikan body parser bawaan agar bisa baca FormData
 export const config = { api: { bodyParser: false } };
@@ -8,39 +10,53 @@ export default async function handler(req, res) {
     const db = await getDB();
     const collection = db.collection('snapshots');
 
-    // --- GET: Ambil snapshot (semua atau per student) ---
+    // --- GET: Ambil snapshot (semua atau per student, dengan pagination) ---
     if (req.method === 'GET') {
-        const { student_id, action } = req.query;
-        const query = student_id ? { student_id: student_id } : {};
-        const snapshots = await collection.find(query).sort({ created_at: -1 }).toArray();
+        try {
+            const { student_id } = req.query;
+            const page = parseInt(req.query.page) || 1;
+            const limit = parseInt(req.query.limit) || 20; // 20 per halaman
+            const skip = (page - 1) * limit;
 
-        // Format data agar konsisten
-        const formatted = snapshots.map(s => ({
-            ...s,
-            id: s._id.toString(),
-            likesCount: s.likes ? s.likes.length : (s.likesCount || 0),
-            comments: s.comments || []
-        }));
+            const query = student_id ? { student_id: student_id } : {};
+            const snapshots = await collection.find(query).sort({ created_at: -1 }).skip(skip).limit(limit).toArray();
+            const total = await collection.countDocuments(query);
 
-        return res.status(200).json({ success: true, data: formatted });
+            // Format data agar konsisten
+            const formatted = snapshots.map(s => ({
+                ...s,
+                id: s._id.toString(),
+                likesCount: s.likes ? s.likes.length : (s.likesCount || 0),
+                comments: s.comments || []
+            }));
+
+            return res.status(200).json({ 
+                success: true, 
+                data: formatted,
+                pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+            });
+        } catch (error) {
+            console.error("GET /api/snapshots error:", error);
+            return res.status(500).json({ success: false, error: 'Server Error: ' + error.message });
+        }
     }
 
     // --- POST: Upload snapshot baru ATAU aksi like/comment ---
     if (req.method === 'POST') {
         const { action } = req.query;
 
-        // Handle like/unlike
+        // Handle like/unlike (Public)
         if (action === 'like') {
             try {
                 let body = req.body;
                 if (typeof body === 'string') body = JSON.parse(body);
                 const { snapshot_id } = body;
 
-                // Gunakan IP atau session sederhana untuk identifikasi user
-                const userIp = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || 'unknown';
+                // Gunakan IP
+                const userIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || req.connection?.remoteAddress || 'unknown';
 
                 const snap = await collection.findOne({ _id: new ObjectId(snapshot_id) });
-                if (!snap) return res.status(404).json({ success: false, message: 'Snapshot tidak ditemukan' });
+                if (!snap) return res.status(404).json({ success: false, error: 'Snapshot tidak ditemukan' });
 
                 const likes = snap.likes || [];
                 const alreadyLiked = likes.includes(userIp);
@@ -53,23 +69,27 @@ export default async function handler(req, res) {
                     return res.status(200).json({ success: true, action: 'liked', likesCount: likes.length + 1 });
                 }
             } catch (error) {
-                return res.status(500).json({ success: false, message: 'Server Error: ' + error.message });
+                console.error("LIKE error:", error);
+                return res.status(500).json({ success: false, error: 'Server Error: ' + error.message });
             }
         }
 
-        // Handle komentar
+        // Handle komentar (Public with basic spam protection)
         if (action === 'comment') {
             try {
                 let body = req.body;
                 if (typeof body === 'string') body = JSON.parse(body);
                 const { snapshot_id, name, text } = body;
 
-                if (!name || !text) return res.status(400).json({ success: false, message: 'Nama dan komentar wajib diisi' });
-                if (text.length > 200) return res.status(400).json({ success: false, message: 'Komentar terlalu panjang (maks 200 karakter)' });
+                if (!name || !text) return res.status(400).json({ success: false, error: 'Nama dan komentar wajib diisi' });
+                if (text.length > 200) return res.status(400).json({ success: false, error: 'Komentar terlalu panjang (maks 200 karakter)' });
+
+                const cleanName = name.replace(/</g, "&lt;").replace(/>/g, "&gt;").substring(0, 50);
+                const cleanText = text.replace(/</g, "&lt;").replace(/>/g, "&gt;").substring(0, 200);
 
                 const newComment = {
-                    name: name.substring(0, 50),
-                    text: text.substring(0, 200),
+                    name: cleanName,
+                    text: cleanText,
                     date: new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
                 };
 
@@ -78,13 +98,18 @@ export default async function handler(req, res) {
                     { $push: { comments: newComment } }
                 );
 
-                return res.status(200).json({ success: true, message: 'Komentar berhasil ditambahkan', comment: newComment });
+                return res.status(200).json({ success: true, message: 'Komentar berhasil ditambahkan', data: newComment });
             } catch (error) {
-                return res.status(500).json({ success: false, message: 'Server Error: ' + error.message });
+                console.error("COMMENT error:", error);
+                return res.status(500).json({ success: false, error: 'Server Error: ' + error.message });
             }
         }
 
         // Handle upload snapshot baru (FormData dengan foto)
+        // Handle upload snapshot baru (Auth admin & student)
+        const user = verifyAuth(req, res, ['admin', 'student']);
+        if (!user) return;
+
         try {
             // Parse multipart form data
             const chunks = [];
@@ -97,7 +122,7 @@ export default async function handler(req, res) {
             // Ambil boundary dari content-type
             const boundaryMatch = contentType.match(/boundary=(.+)$/);
             if (!boundaryMatch) {
-                return res.status(400).json({ success: false, message: 'Request bukan multipart/form-data' });
+                return res.status(400).json({ success: false, error: 'Request bukan multipart/form-data' });
             }
 
             const boundary = boundaryMatch[1];
@@ -119,22 +144,24 @@ export default async function handler(req, res) {
                     studentId = part.body.toString('utf-8').trim();
                 } else if (partName === 'image') {
                     imageMimeType = part.headers['content-type'] || 'image/jpeg';
-                    imageBase64 = `data:${imageMimeType};base64,${part.body.toString('base64')}`;
+                    const base64Str = part.body.toString('base64');
+                    if (base64Str.length > 5 * 1024 * 1024 * 1.33) {
+                       return res.status(400).json({ success: false, error: 'Foto melebihi batas 5MB' });
+                    }
+                    imageBase64 = `data:${imageMimeType};base64,${base64Str}`;
                 }
             }
 
-            if (!imageBase64) {
-                return res.status(400).json({ success: false, message: 'File gambar tidak ditemukan' });
-            }
+            if (!imageBase64) return res.status(400).json({ success: false, error: 'File gambar tidak ditemukan' });
+            if (!studentId) return res.status(400).json({ success: false, error: 'student_id diperlukan' });
 
-            if (!studentId) {
-                return res.status(400).json({ success: false, message: 'student_id diperlukan' });
-            }
+            // Upload ke Cloudinary
+            const uploadResult = await uploadToCloudinary(imageBase64, 'xrpl_snapshots');
 
             const newSnapshot = {
                 student_id: studentId,
-                caption: caption || 'Snapshot',
-                image_url: imageBase64,
+                caption: caption.replace(/</g, "&lt;").replace(/>/g, "&gt;") || 'Snapshot',
+                image_url: uploadResult.secure_url,
                 likes: [],
                 comments: [],
                 created_at: new Date()
@@ -144,27 +171,32 @@ export default async function handler(req, res) {
             return res.status(201).json({
                 success: true,
                 message: 'Snapshot berhasil diunggah',
-                id: result.insertedId.toString()
+                data: { id: result.insertedId.toString(), ...newSnapshot }
             });
         } catch (error) {
-            return res.status(500).json({ success: false, message: 'Server Error: ' + error.message });
+            console.error("UPLOAD SNAPSHOT error:", error);
+            return res.status(500).json({ success: false, error: 'Server Error: ' + error.message });
         }
     }
 
-    // --- DELETE: Hapus snapshot ---
+    // --- DELETE: Hapus snapshot (Admin & Student) ---
     if (req.method === 'DELETE') {
+        const user = verifyAuth(req, res, ['admin', 'student']);
+        if (!user) return;
+
         const { id } = req.query;
-        if (!id) return res.status(400).json({ success: false, message: 'ID snapshot diperlukan' });
+        if (!id) return res.status(400).json({ success: false, error: 'ID snapshot diperlukan' });
 
         try {
             await collection.deleteOne({ _id: new ObjectId(id) });
             return res.status(200).json({ success: true, message: 'Snapshot berhasil dihapus' });
         } catch (error) {
-            return res.status(500).json({ success: false, message: 'Server Error: ' + error.message });
+            console.error("DELETE SNAPSHOT error:", error);
+            return res.status(500).json({ success: false, error: 'Server Error: ' + error.message });
         }
     }
 
-    res.status(405).json({ message: 'Method Not Allowed' });
+    res.status(405).json({ success: false, error: 'Method Not Allowed' });
 }
 
 // Helper: parse manual multipart/form-data
