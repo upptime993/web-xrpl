@@ -6,21 +6,63 @@ document.addEventListener('DOMContentLoaded', () => {
     let galleryData = [];
     let projectsData = [];
 
-    // Ambil data: selalu dari MongoDB API (real-time), fallback ke data.json
+    /**
+     * Helper: fetch dengan error handling yang benar
+     * Cek res.ok sebelum parsing JSON
+     */
+    async function safeFetch(url, options = {}) {
+        const res = await fetch(url, options);
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.message || `HTTP ${res.status}`);
+        }
+        return data;
+    }
+
+    /**
+     * Toast notification — menggantikan alert()
+     */
+    function showToast(message, type = 'success') {
+        const existing = document.querySelectorAll('.xrpl-toast');
+        existing.forEach(t => t.remove());
+
+        const colors = {
+            success: { bg: 'rgba(0,255,136,0.15)', border: '#00ff88', text: '#00ff88', icon: '✅' },
+            error: { bg: 'rgba(239,68,68,0.15)', border: '#ef4444', text: '#fca5a5', icon: '❌' },
+            info: { bg: 'rgba(0,212,255,0.15)', border: '#00d4ff', text: '#00d4ff', icon: 'ℹ️' }
+        };
+        const c = colors[type] || colors.info;
+
+        const toast = document.createElement('div');
+        toast.className = 'xrpl-toast fixed bottom-4 right-4 px-5 py-3 rounded-xl text-sm z-[9999] animate-fade-in-up shadow-2xl';
+        toast.style.cssText = `background:${c.bg};border:1px solid ${c.border};color:${c.text};backdrop-filter:blur(12px);max-width:360px;`;
+        toast.innerHTML = `${c.icon} ${escHtml(message)}`;
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.transition = 'opacity 0.3s, transform 0.3s';
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(10px)';
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
+    }
+
+    /**
+     * Ambil data dari MongoDB API (tanpa fallback ke data.json)
+     */
     async function loadData() {
         try {
-            // Fetch students dan gallery sekaligus dari MongoDB API (real-time)
-            const [studentRes, galleryRes] = await Promise.all([
-                fetch('api/students'),
-                fetch('api/gallery').catch(() => ({ json: () => ({ success: false }) }))
+            // Fetch semua data sekaligus
+            const [studentRes, galleryRes, projRes] = await Promise.allSettled([
+                safeFetch('api/students?limit=100'),
+                safeFetch('api/gallery?limit=100'),
+                safeFetch('api/projects?limit=100')
             ]);
-            const studentJson = await studentRes.json();
-            const galleryJson = await galleryRes.json();
 
-            if (studentJson.success && studentJson.data && studentJson.data.length > 0) {
-                // Map data MongoDB ke format yang dipakai app.js
-                studentsData = studentJson.data.map(s => ({
-                    id: s.sort_order || parseInt(s._id.toString().slice(-4), 16) % 100 || 1,
+            // Students
+            if (studentRes.status === 'fulfilled' && studentRes.value.data) {
+                studentsData = studentRes.value.data.map(s => ({
+                    id: s.sort_order || parseInt(String(s._id).slice(-4), 16) % 100 || 1,
                     _id: s._id,
                     name: s.name || s.full_name,
                     quote: s.quote || '',
@@ -30,74 +72,33 @@ document.addEventListener('DOMContentLoaded', () => {
                     photo: s.photo || null,
                     username: s.username || null
                 }));
-
-                // Gallery dari MongoDB API (real-time), fallback ke data.json
-                if (galleryJson.success && galleryJson.data && galleryJson.data.length > 0) {
-                    galleryData = galleryJson.data;
-                } else {
-                    // Fallback ke data.json
-                    try {
-                        const fallback = await fetch('data.json');
-                        const fallbackData = await fallback.json();
-                        galleryData = fallbackData.gallery || [];
-                    } catch(e) { galleryData = []; }
-                }
-
-                // Projects dari MongoDB API (real-time), fallback ke localStorage
-                try {
-                    const projRes = await fetch('api/projects').catch(() => ({ json: () => ({ success: false }) }));
-                    const projJson = await projRes.json();
-                    if (projJson.success && projJson.data) {
-                        projectsData = projJson.data;
-                    } else {
-                        const lsProjects = localStorage.getItem('xrpl_projects_db');
-                        projectsData = lsProjects ? JSON.parse(lsProjects) : [];
-                    }
-                } catch(e) {
-                    const lsProjects = localStorage.getItem('xrpl_projects_db');
-                    projectsData = lsProjects ? JSON.parse(lsProjects) : [];
-                }
-
-                renderStudents();
-                renderGallery();
-                renderProjects();
-                updateCounterStats();
-                loadStrukturKelas();
-                hilangkanLoadingScreen();
-
-            } else {
-                // Fallback: fetch dari data.json jika MongoDB kosong atau belum di-setup
-                const response = await fetch('data.json');
-                if (!response.ok) throw new Error('Gagal memuat data');
-                const data = await response.json();
-                studentsData = data.students;
-                galleryData  = data.gallery;
-                projectsData = [];
-                renderStudents();
-                renderGallery();
-                updateCounterStats();
-                loadStrukturKelas();
-                hilangkanLoadingScreen();
             }
+
+            // Gallery
+            if (galleryRes.status === 'fulfilled' && galleryRes.value.data) {
+                galleryData = galleryRes.value.data;
+            }
+
+            // Projects
+            if (projRes.status === 'fulfilled' && projRes.value.data) {
+                projectsData = projRes.value.data;
+            }
+
+            // Render semua
+            renderStudents();
+            renderGallery();
+            renderProjects();
+            updateCounterStats();
+            loadStrukturKelas();
+            hilangkanLoadingScreen();
+
         } catch (error) {
             console.error("Error memuat data:", error);
-            // Fallback ke localStorage jika semua gagal
-            try {
-                const lsStudents = localStorage.getItem('xrpl_students_db');
-                const lsGallery  = localStorage.getItem('xrpl_gallery_db');
-                if (lsStudents) studentsData = JSON.parse(lsStudents);
-                if (lsGallery)  galleryData  = JSON.parse(lsGallery);
-                if (studentsData.length > 0 || galleryData.length > 0) {
-                    renderStudents();
-                    renderGallery();
-                    hilangkanLoadingScreen();
-                    return;
-                }
-            } catch(e) {}
             document.getElementById('loading-screen').innerHTML = `
-                <div class="text-center">
+                <div class="text-center px-4">
                     <h1 class="text-white text-2xl mb-4">Oops! Gagal memuat data.</h1>
-                    <p class="text-text-secondary">Pastikan kamu membukanya lewat Local Server (Live Server), bukan klik 2x file HTML-nya.</p>
+                    <p class="text-text-secondary mb-4">${escHtml(error.message)}</p>
+                    <button onclick="location.reload()" class="px-6 py-2 rounded-full bg-gradient-to-r from-cyber-blue to-electric-purple text-white font-bold">Coba Lagi</button>
                 </div>`;
         }
     }
@@ -112,7 +113,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         studentsData.forEach((s, index) => {
             const delay = (index % 5) * 100;
-            // Cek foto nyata dulu; fallback ke avatar inisial
             const hasPhoto = s.photo && s.photo.length > 0;
             const avatarUrl = hasPhoto
                 ? s.photo
@@ -122,10 +122,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="student-card glass rounded-2xl p-4 text-center cursor-pointer transition-all duration-300 hover:border-cyber-blue/50 hover:shadow-[0_10px_20px_rgba(0,212,255,0.1)] hover:-translate-y-1 reveal" style="transition-delay: ${delay}ms" data-id="${s.id}" tabindex="0">
                     <div class="relative w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-3">
                         <div class="absolute inset-0 bg-gray-700 animate-pulse rounded-full z-0"></div>
-                        <img src="${avatarUrl}" alt="${s.name}" onload="this.previousElementSibling.style.display='none'" class="relative z-10 w-full h-full rounded-full object-cover border-2 transition-colors" style="border-color:#${s.color || '00d4ff'}55">
+                        <img src="${avatarUrl}" alt="${escHtml(s.name)}" onload="this.previousElementSibling.style.display='none'" onerror="this.previousElementSibling.style.display='none'" class="relative z-10 w-full h-full rounded-full object-cover border-2 transition-colors" style="border-color:#${s.color || '00d4ff'}55">
                         ${hasPhoto ? `<div class="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-neon-green border-2 border-dark-section z-20 flex items-center justify-center text-[8px]">📷</div>` : ''}
                     </div>
-                    <h3 class="text-sm font-semibold text-white truncate px-1">${s.name}</h3>
+                    <h3 class="text-sm font-semibold text-white truncate px-1">${escHtml(s.name)}</h3>
                     <p class="text-xs text-text-secondary mt-1 font-mono">No. ${s.id}</p>
                 </div>
             `;
@@ -141,20 +141,20 @@ document.addEventListener('DOMContentLoaded', () => {
         
         galleryData.forEach((item, index) => {
             const delay = (index % 4) * 100;
-            // Gunakan foto asli jika ada (dari dashboard), fallback ke placeholder
+            const cat = item.category || 'event';
             const imgUrl = (item.image && item.image.length > 0)
                 ? item.image
-                : `https://placehold.co/600x600/${item.color || '7b2ff7'}/fff?text=${item.category.toUpperCase()}`;
+                : `https://placehold.co/600x600/${item.color || '7b2ff7'}/fff?text=${cat.toUpperCase()}`;
             const spanCls = item.span || 'col-span-1';
 
             html += `
-                <div class="gallery-item rounded-xl overflow-hidden cursor-pointer relative group reveal ${spanCls}" data-category="${item.category}" data-index="${index}" style="transition-delay: ${delay}ms">
+                <div class="gallery-item rounded-xl overflow-hidden cursor-pointer relative group reveal ${spanCls}" data-category="${cat}" data-index="${index}" style="transition-delay: ${delay}ms">
                     <div class="absolute inset-0 bg-gray-800 animate-pulse z-0"></div>
-                    <img src="${imgUrl}" alt="${item.title}" onload="this.previousElementSibling.style.display='none'" class="relative z-10 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" loading="lazy">
+                    <img src="${imgUrl}" alt="${escHtml(item.title)}" onload="this.previousElementSibling.style.display='none'" onerror="this.previousElementSibling.style.display='none'" class="relative z-10 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" loading="lazy">
                     <div class="absolute inset-0 z-20 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end">
                         <div class="p-3 w-full transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                            <span class="text-[10px] uppercase font-bold bg-white/20 px-2 py-0.5 rounded backdrop-blur-sm mb-1 inline-block text-white">${item.category}</span>
-                            <p class="text-sm font-medium text-white leading-tight">${item.title}</p>
+                            <span class="text-[10px] uppercase font-bold bg-white/20 px-2 py-0.5 rounded backdrop-blur-sm mb-1 inline-block text-white">${cat}</span>
+                            <p class="text-sm font-medium text-white leading-tight">${escHtml(item.title)}</p>
                         </div>
                     </div>
                 </div>
@@ -164,7 +164,6 @@ document.addEventListener('DOMContentLoaded', () => {
         initScrollAnimations();
     }
 
-    // Render projek dari localStorage (jika ada data dari dashboard)
     function renderProjects() {
         if (!projectsData || projectsData.length === 0) return;
         const container = document.querySelector('#projek .grid');
@@ -182,18 +181,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const imgSrc = (p.image && p.image.length > 0)
                 ? p.image
                 : `https://placehold.co/600x400/${p.color || '2d3436'}/${p.color ? 'fff' : '00d4ff'}?text=${encodeURIComponent(p.title || 'Projek')}`;
-            const tags = (p.tags || []).map(t => `<span class="px-3 py-1 rounded-full text-xs font-mono ${c.bg} ${c.text} border ${c.border}">${t}</span>`).join('');
+            const tags = (p.tags || []).map(t => `<span class="px-3 py-1 rounded-full text-xs font-mono ${c.bg} ${c.text} border ${c.border}">${escHtml(t)}</span>`).join('');
             const delayClass = i === 0 ? '' : i === 1 ? 'delay-100' : 'delay-200';
             const linkHtml = p.link ? `<a href="${p.link}" target="_blank" rel="noopener" class="mt-2 inline-flex items-center gap-1 text-xs ${c.text} hover:underline">🔗 Lihat Projek</a>` : '';
 
             html += `
                 <article class="glass rounded-2xl overflow-hidden group reveal ${delayClass} hover:-translate-y-2 transition-transform duration-300">
                     <div class="aspect-video w-full overflow-hidden relative">
-                        <img src="${imgSrc}" alt="${p.title}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" loading="lazy">
+                        <img src="${imgSrc}" alt="${escHtml(p.title)}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" loading="lazy">
                     </div>
                     <div class="p-6">
-                        <h3 class="text-xl font-heading font-bold text-white mb-2 ${c.hover} transition-colors">${p.title}</h3>
-                        <p class="text-sm text-text-secondary mb-4 line-clamp-2">${p.description || ''}</p>
+                        <h3 class="text-xl font-heading font-bold text-white mb-2 ${c.hover} transition-colors">${escHtml(p.title)}</h3>
+                        <p class="text-sm text-text-secondary mb-4 line-clamp-2">${escHtml(p.description || '')}</p>
                         <div class="flex flex-wrap gap-2 mb-2">${tags}</div>
                         ${linkHtml}
                     </div>
@@ -226,13 +225,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const list = document.getElementById('guestbook-list');
         const emptyMsg = document.getElementById('gb-empty');
 
-        // Load messages from MongoDB
-        const loadMessages = () => {
-            fetch('api/guestbook')
-            .then(r => r.json())
-            .then(res => {
-                if (!res.success) throw new Error(res.message);
-                const messages = res.data;
+        const loadMessages = async () => {
+            try {
+                const res = await safeFetch('api/guestbook?limit=50');
+                const messages = res.data || [];
                 if (messages.length === 0) {
                     emptyMsg.style.display = 'block';
                     return;
@@ -247,64 +243,50 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyber-blue/30 to-electric-purple/30 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">${(msg.name||'?')[0].toUpperCase()}</div>
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-baseline gap-2 flex-wrap mb-1">
-                                    <span class="text-white text-sm font-semibold">${msg.name}</span>
+                                    <span class="text-white text-sm font-semibold">${escHtml(msg.name)}</span>
                                     <span class="text-white/30 text-[10px]">${msg.date}</span>
                                 </div>
-                                <p class="text-text-secondary text-sm break-words leading-relaxed">${msg.text}</p>
+                                <p class="text-text-secondary text-sm break-words leading-relaxed">${escHtml(msg.text)}</p>
                             </div>
                         </div>
                     `;
                     list.appendChild(div);
                 });
-            })
-            .catch(() => {
-                // Tetap tampilkan form walau gagal load
-            });
+            } catch (error) {
+                console.error('Load guestbook error:', error);
+            }
         };
 
-        form.addEventListener('submit', (e) => {
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const nameInput = document.getElementById('gb-name');
             const msgInput = document.getElementById('gb-message');
-            
             const btn = form.querySelector('button[type="submit"]');
-            if (!nameInput.value.trim() || !msgInput.value.trim()) return;
             
-            if (btn) btn.disabled = true;
-            if (window.showLoader) window.showLoader();
+            if (!nameInput.value.trim() || !msgInput.value.trim()) return;
 
-            fetch('api/guestbook', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: nameInput.value.trim(), text: msgInput.value.trim() })
-            })
-            .then(r => r.json())
-            .then(res => {
-                if (window.hideLoader) window.hideLoader();
-                if (btn) btn.disabled = false;
-                if (res.success) {
-                    nameInput.value = '';
-                    msgInput.value = '';
-                    loadMessages();
-                    
-                    // Show a quick custom toast on success
-                    const toast = document.createElement('div');
-                    toast.className = 'fixed bottom-4 right-4 bg-neon-green/20 border border-neon-green text-neon-green px-4 py-2 rounded-lg text-sm z-50 animate-fade-in-up';
-                    toast.innerHTML = '✅ Pesan berhasil dikirim!';
-                    document.body.appendChild(toast);
-                    setTimeout(() => {
-                        toast.classList.add('opacity-0', 'transition-opacity', 'duration-300');
-                        setTimeout(() => toast.remove(), 300);
-                    }, 3000);
-                } else {
-                    alert(res.message || 'Gagal kirim pesan.');
+            // Loading state
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span class="animate-pulse">⏳ Mengirim...</span>'; }
+
+            try {
+                const res = await safeFetch('api/guestbook', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: nameInput.value.trim(), text: msgInput.value.trim() })
+                });
+
+                nameInput.value = '';
+                msgInput.value = '';
+                loadMessages();
+                showToast('Pesan berhasil dikirim!', 'success');
+            } catch (error) {
+                showToast(error.message || 'Gagal kirim pesan.', 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<span>Kirim Pesan</span><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>';
                 }
-            })
-            .catch(() => {
-                if (window.hideLoader) window.hideLoader();
-                if (btn) btn.disabled = false;
-                alert('Gagal koneksi ke server.');
-            });
+            }
         });
 
         loadMessages();
@@ -360,7 +342,6 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             particles.forEach(p => { p.update(); p.draw(); });
             
-            // Garis penghubung
             for (let i = 0; i < particles.length; i++) {
                 for (let j = i + 1; j < particles.length; j++) {
                     const dx = particles[i].x - particles[j].x;
@@ -420,7 +401,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 entry.target.classList.add('active');
                 observer.unobserve(entry.target);
                 
-                // Counter Trigger
                 if(entry.target.id === 'stats-container' || entry.target.querySelector('.counter')) {
                     const counters = entry.target.querySelectorAll('.counter') || [entry.target];
                     counters.forEach(counter => {
@@ -454,7 +434,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const navLinks = document.querySelectorAll('.nav-link');
     const backToTop = document.getElementById('back-to-top');
 
-    // Fix: Back-to-top click handler — HARUS di luar scroll handler
     backToTop.addEventListener('click', () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     });
@@ -543,18 +522,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.getElementById('modal-gallery').innerHTML = '<div class="col-span-3 text-center py-4"><span class="text-white text-sm animate-pulse">Memuat gallery...</span></div>';
 
-        fetch(`api/snapshots?student_id=${s._id}`)
-            .then(res => res.json())
+        safeFetch(`api/snapshots?student_id=${s._id}`)
             .then(data => {
                 let miniGalleryHTML = '';
-                if (data.success && data.data.length > 0) {
+                if (data.data && data.data.length > 0) {
                     window._currentSnaps = window._currentSnaps || {};
                     window._currentSnaps[s._id] = data.data;
 
-                    const studentSnaps = data.data.slice(0, 9);
-                    studentSnaps.forEach(snap => {
+                    data.data.slice(0, 9).forEach(snap => {
                         miniGalleryHTML += `<div class="aspect-square rounded-lg overflow-hidden bg-white/5 cursor-pointer group relative snap-thumb" data-snap-id="${snap.id}" data-student-id="${s._id}">
-                            <img src="${snap.image_url}" alt="${snap.caption || 'Snapshot'}" class="w-full h-full object-cover group-hover:scale-110 transition-all duration-300">
+                            <img src="${snap.image_url}" alt="${escHtml(snap.caption || 'Snapshot')}" class="w-full h-full object-cover group-hover:scale-110 transition-all duration-300">
                             <div class="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
                                 <span class="text-white text-xs">\u2764\ufe0f ${snap.likesCount}</span>
                                 <span class="text-white text-xs">\ud83d\udcac ${snap.comments ? snap.comments.length : 0}</span>
@@ -569,12 +546,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 document.getElementById('modal-gallery').innerHTML = miniGalleryHTML;
                 document.querySelectorAll('.snap-thumb').forEach(el => {
-                    // Update: dataset returns string, lightbox uses string ID now
                     el.addEventListener('click', () => window.openSnapLightbox(el.dataset.snapId, el.dataset.studentId));
                 });
             })
             .catch(() => {
-                document.getElementById('modal-gallery').innerHTML = '<div class="col-span-3 text-center py-4 text-gray-500 text-xs text-red-400">Gagal mengambil foto. Pastikan koneksi server nyala.</div>';
+                document.getElementById('modal-gallery').innerHTML = '<div class="col-span-3 text-center py-4 text-red-400 text-xs">Gagal mengambil foto.</div>';
             });
 
         lastFocusedElement = document.activeElement;
@@ -600,7 +576,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 300);
     };
 
-    // Event Delegation untuk Student Grid
     document.getElementById('students-grid').addEventListener('click', (e) => {
         const card = e.target.closest('.student-card');
         if (card) openModal(card.getAttribute('data-id'));
@@ -662,7 +637,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const dataIndex = currentVisibleGallery[currentLbIndex];
             const data = galleryData[dataIndex];
             
-            // Fix: Gunakan foto asli jika ada, baru fallback ke placeholder
             const imgUrl = (data.image && data.image.length > 0)
                 ? data.image
                 : `https://placehold.co/1200x800/${data.color}/fff?text=${(data.title || 'Photo').replace(/ /g, '+')}`;
@@ -712,7 +686,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 300);
     };
 
-    // Event Delegation untuk Gallery Grid
     document.getElementById('gallery-grid').addEventListener('click', (e) => {
         const item = e.target.closest('.gallery-item');
         if (item) openLightbox(parseInt(item.getAttribute('data-index')));
@@ -733,7 +706,6 @@ document.addEventListener('DOMContentLoaded', () => {
         updateLightboxContent();
     });
 
-    // Global Keyboard Listeners
     window.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             const snapLb = document.getElementById('snap-lightbox');
@@ -763,7 +735,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('snap-lb-caption').textContent = snap.caption || 'Snapshot';
         document.getElementById('snap-lb-meta').textContent = snap.created_at || '';
         
-        window._currentSnapData = snap; // Save to global for interactions
+        window._currentSnapData = snap;
         renderSnapInteractions();
 
         const lb = document.getElementById('snap-lightbox');
@@ -817,36 +789,38 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('snap-lb-close').addEventListener('click', closeSnapLightbox);
     document.getElementById('snap-lb-overlay').addEventListener('click', closeSnapLightbox);
 
-    document.getElementById('snap-lb-like-btn').addEventListener('click', () => {
+    document.getElementById('snap-lb-like-btn').addEventListener('click', async () => {
         if (!currentSnapId) return;
         
-        fetch('api/snapshots?action=like', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ snapshot_id: currentSnapId })
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                if (data.action === 'liked') {
-                    window._currentSnapData.likesCount++;
-                    window._currentSnapData.userLiked = true;
-                } else {
-                    window._currentSnapData.likesCount = Math.max(0, window._currentSnapData.likesCount - 1);
-                    window._currentSnapData.userLiked = false;
-                }
-                renderSnapInteractions();
+        try {
+            const data = await safeFetch('api/snapshots?action=like', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ snapshot_id: currentSnapId })
+            });
+
+            if (data.action === 'liked') {
+                window._currentSnapData.likesCount++;
+                window._currentSnapData.userLiked = true;
+            } else {
+                window._currentSnapData.likesCount = Math.max(0, window._currentSnapData.likesCount - 1);
+                window._currentSnapData.userLiked = false;
             }
-        });
+            renderSnapInteractions();
+        } catch (error) {
+            showToast(error.message || 'Gagal memproses like', 'error');
+        }
     });
 
     document.getElementById('snap-lb-download-btn').addEventListener('click', () => {
         const img = document.getElementById('snap-lb-img');
         if (!img.src) return;
         
-        // Buat fake link untuk trigger download attribute
         fetch(img.src)
-            .then(res => res.blob())
+            .then(res => {
+                if (!res.ok) throw new Error('Gagal download');
+                return res.blob();
+            })
             .then(blob => {
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -858,10 +832,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.URL.revokeObjectURL(url);
                 a.remove();
             })
-            .catch(() => alert('Gagal mendownload foto'));
+            .catch(() => showToast('Gagal mendownload foto', 'error'));
     });
 
-    document.getElementById('snap-lb-form').addEventListener('submit', (e) => {
+    document.getElementById('snap-lb-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         if (!currentSnapId) return;
         const name = document.getElementById('snap-lb-name').value.trim();
@@ -871,29 +845,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const btn = e.target.querySelector('button[type="submit"]');
         btn.disabled = true;
 
-        fetch('api/snapshots?action=comment', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ snapshot_id: currentSnapId, name, text })
-        })
-        .then(res => res.json())
-        .then(data => {
+        try {
+            const data = await safeFetch('api/snapshots?action=comment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ snapshot_id: currentSnapId, name, text })
+            });
+
+            if (!window._currentSnapData.comments) window._currentSnapData.comments = [];
+            window._currentSnapData.comments.push({ name, text, date: 'Baru saja' });
+            document.getElementById('snap-lb-txt').value = '';
+            renderSnapInteractions();
+        } catch (error) {
+            showToast(error.message || 'Gagal mengirim komentar', 'error');
+        } finally {
             btn.disabled = false;
-            if (data.success) {
-                // Tambahkan langsung secara lokal untuk real-time feel
-                if (!window._currentSnapData.comments) window._currentSnapData.comments = [];
-                window._currentSnapData.comments.push({ name, text, date: 'Baru saja' });
-                
-                document.getElementById('snap-lb-txt').value = '';
-                renderSnapInteractions();
-            } else {
-                alert(data.message || 'Gagal mengirim komentar');
-            }
-        })
-        .catch(() => {
-            btn.disabled = false;
-            alert('Gagal koneksi server');
-        });
+        }
     });
 
     // ==========================================
@@ -907,9 +874,8 @@ document.addEventListener('DOMContentLoaded', () => {
         el.style.paddingRight = '3px';
         el.style.whiteSpace = 'nowrap';
         el.style.display = 'inline-block';
-        el.style.animation = 'blinkCursor 0.8s infinite'; // Assuming blink cursor css is there or adding it via logic
+        el.style.animation = 'blinkCursor 0.8s infinite';
         
-        // Ensure cursor blink style is injected
         if (!document.getElementById('cursor-style')) {
             const style = document.createElement('style');
             style.id = 'cursor-style';
@@ -936,12 +902,12 @@ document.addEventListener('DOMContentLoaded', () => {
             let typeSpeed = isDeleting ? 40 : 100;
 
             if (!isDeleting && ci === currentPhrase.length) {
-                typeSpeed = 2000; // Pause at end of word
+                typeSpeed = 2000;
                 isDeleting = true;
             } else if (isDeleting && ci === 0) {
                 isDeleting = false;
                 pi = (pi + 1) % phrases.length;
-                typeSpeed = 400; // Pause before typing next word
+                typeSpeed = 400;
             }
 
             setTimeout(type, typeSpeed);
@@ -964,7 +930,6 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (label.includes('kenangan') || label.includes('memori')) {
                 counter.setAttribute('data-target', galleryData.length || 0);
             }
-            // Keluarga tetap 1
         });
     }
 
@@ -975,22 +940,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById('struktur-tree');
         if (!container) return;
 
-        fetch('api/struktur')
-            .then(r => r.json())
+        safeFetch('api/struktur')
             .then(res => {
-                if (!res.success || !res.data || res.data.length === 0) {
-                    // Jika belum ada data di MongoDB, biarkan konten default
-                    return;
-                }
+                if (!res.data || res.data.length === 0) return;
                 renderStrukturTree(container, res.data);
             })
             .catch(() => {
-                // Jika API gagal, biarkan konten default
+                // Biarkan konten default jika API gagal
             });
     }
 
     function renderStrukturTree(container, data) {
-        // Kelompokkan berdasarkan level
         const waliKelas = data.filter(d => parseFloat(d.level) === 0);
         const guruProduktif = data.filter(d => parseFloat(d.level) === 0.5).slice(0, 5);
         const ketuaWakil = data.filter(d => parseFloat(d.level) === 1);
@@ -1026,7 +986,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let html = '<div class="flex flex-col items-center w-full relative pb-10">';
 
-        // 1. Wali Kelas (Root)
         if (waliKelas.length > 0) {
             html += `
             <div class="flex flex-col items-center w-full reveal">
@@ -1036,21 +995,14 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>`;
         }
 
-        // 2. Guru Produktif
         html += renderRow(guruProduktif, 'delay-50', 'w-16 h-16 md:w-20 md:h-20', 'text-base md:text-lg', 'text-xs md:text-sm');
-        
-        // 3. Ketua / Wakil
         html += renderRow(ketuaWakil, 'delay-100', 'w-14 h-14 md:w-16 md:h-16', 'text-sm md:text-base', 'text-[10px] md:text-xs');
-        
-        // 4. Staff (Sekretaris / Bendahara)
         html += renderRow(staff, 'delay-200', 'w-12 h-12 md:w-14 md:h-14', 'text-xs md:text-sm', 'text-[9px] md:text-[10px]');
         
-        // 5. Anggota
         if (anggota.length > 0) {
             html += `
             <div class="flex flex-col items-center w-full reveal delay-300">
                 <div class="struktur-line-v w-[2px] h-8 md:h-12 my-2 z-0"></div>
-                <!-- Anggota Grid Pinned -->
                 <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4 w-full px-2 max-w-6xl mt-0 relative z-10">
                     ${anggota.map(a => `
                     <div class="glass p-2 md:p-3 rounded-xl flex items-center gap-2 md:gap-3 hover:-translate-y-1 transition-transform border-l-2" style="border-left-color:#${a.color || '00d4ff'}">
