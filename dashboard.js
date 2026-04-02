@@ -910,9 +910,42 @@ function changePassword(e) {
     if (newPw !== confirmPw) return showToast('Konfirmasi password tidak cocok!', 'error');
     if (newPw.length < 6) return showToast('Password baru minimal 6 karakter!', 'error');
 
-    const user = JSON.parse(localStorage.getItem('xrpl_admin_user') || '{}');
-    showToast('Fitur ganti password admin akan segera tersedia.', 'info');
-    document.getElementById('change-password-form').reset();
+    safeFetch('api/auth', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oldPassword: oldPw, newPassword: newPw })
+    })
+    .then(() => {
+        showToast('Password admin berhasil diubah!');
+        document.getElementById('change-password-form').reset();
+    })
+    .catch(err => showToast(err.message || 'Gagal mengubah password.', 'error'));
+}
+
+function changeAdminUsername(e) {
+    e.preventDefault();
+    const newUsername = document.getElementById('admin-new-username').value.trim();
+    if (!newUsername) return showToast('Username baru wajib diisi!', 'error');
+    if (newUsername.length < 3) return showToast('Username minimal 3 karakter!', 'error');
+
+    safeFetch('api/auth', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newUsername })
+    })
+    .then(data => {
+        const user = JSON.parse(localStorage.getItem('xrpl_admin_user') || '{}');
+        user.username = newUsername;
+        localStorage.setItem('xrpl_admin_user', JSON.stringify(user));
+        
+        showToast('Username admin berhasil diubah!');
+        document.getElementById('admin-username-form').reset();
+        
+        // Perbarui UI jika diperlukan (misal: header profil, dll)
+        const usernameEl = document.getElementById('current-username');
+        if (usernameEl) usernameEl.textContent = `@${newUsername}`;
+    })
+    .catch(err => showToast(err.message || 'Gagal mengubah username.', 'error'));
 }
 
 function changeStudentPassword(e) {
@@ -924,13 +957,10 @@ function changeStudentPassword(e) {
     if (newPw !== confirmPw) return showToast('Konfirmasi password tidak cocok!', 'error');
     if (newPw.length < 6) return showToast('Password baru minimal 6 karakter!', 'error');
 
-    const user = JSON.parse(localStorage.getItem('xrpl_admin_user') || '{}');
-    if (!user.username) return showToast('Data user tidak ditemukan.', 'error');
-
     safeFetch('api/auth', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: user.username, newPassword: newPw, oldPassword: oldPw })
+        body: JSON.stringify({ oldPassword: oldPw, newPassword: newPw })
     })
     .then(() => {
         showToast('Password berhasil diubah!');
@@ -945,17 +975,16 @@ function changeStudentUsername(e) {
     if (!newUsername) return showToast('Username baru wajib diisi!', 'error');
     if (newUsername.length < 3) return showToast('Username minimal 3 karakter!', 'error');
 
-    const user = JSON.parse(localStorage.getItem('xrpl_admin_user') || '{}');
-    const targetId = window.CURRENT_MONGO_ID || window.CURRENT_USER_ID;
-
-    safeFetch(`api/students?id=${targetId}`, {
+    safeFetch('api/auth', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: newUsername })
+        body: JSON.stringify({ newUsername })
     })
-    .then(() => {
+    .then(data => {
+        const user = JSON.parse(localStorage.getItem('xrpl_admin_user') || '{}');
         user.username = newUsername;
         localStorage.setItem('xrpl_admin_user', JSON.stringify(user));
+        
         showToast('Username berhasil diubah!');
         document.getElementById('student-username-form').reset();
     })

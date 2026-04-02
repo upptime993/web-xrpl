@@ -405,29 +405,44 @@
                 <!-- ADMIN SETTINGS -->
                 <div id="settings-admin">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <!-- Change Password -->
-                        <div class="glass rounded-2xl p-6">
-                            <h2 class="font-semibold text-white mb-1 flex items-center gap-2">🔐 Ganti Password</h2>
-                            <p class="text-xs text-gray-500 mb-5">Default: admin / admin123</p>
-                            <form id="change-password-form" class="space-y-4" onsubmit="changePassword(event)">
-                                <div>
-                                    <label class="text-xs text-gray-400 mb-1 block">Password Lama</label>
-                                    <input type="password" id="old-password" class="input-f" placeholder="••••••••" required>
-                                </div>
-                                <div>
-                                    <label class="text-xs text-gray-400 mb-1 block">Password Baru</label>
-                                    <input type="password" id="new-password" class="input-f" placeholder="Minimal 6 karakter" required minlength="6">
-                                </div>
-                                <div>
-                                    <label class="text-xs text-gray-400 mb-1 block">Konfirmasi Password Baru</label>
-                                    <input type="password" id="confirm-password" class="input-f" placeholder="••••••••" required>
-                                </div>
-                                <button type="submit" class="btn-primary w-full">💾 Simpan Password</button>
-                            </form>
+                        <div class="space-y-6">
+                            <!-- Change Password -->
+                            <div class="glass rounded-2xl p-6">
+                                <h2 class="font-semibold text-white mb-1 flex items-center gap-2">🔐 Ganti Password</h2>
+                                <p class="text-xs text-gray-500 mb-5">Minimal 6 karakter</p>
+                                <form id="change-password-form" class="space-y-4" onsubmit="changePassword(event)">
+                                    <div>
+                                        <label class="text-xs text-gray-400 mb-1 block">Password Lama</label>
+                                        <input type="password" id="old-password" class="input-f" placeholder="••••••••" required>
+                                    </div>
+                                    <div>
+                                        <label class="text-xs text-gray-400 mb-1 block">Password Baru</label>
+                                        <input type="password" id="new-password" class="input-f" placeholder="Minimal 6 karakter" required minlength="6">
+                                    </div>
+                                    <div>
+                                        <label class="text-xs text-gray-400 mb-1 block">Konfirmasi Password Baru</label>
+                                        <input type="password" id="confirm-password" class="input-f" placeholder="••••••••" required>
+                                    </div>
+                                    <button type="submit" class="btn-primary w-full">💾 Simpan Password</button>
+                                </form>
+                            </div>
+
+                            <!-- Change Username (Admin) -->
+                            <div class="glass rounded-2xl p-6">
+                                <h2 class="font-semibold text-white mb-1 flex items-center gap-2">👤 Ganti Username Admin</h2>
+                                <p class="text-xs text-gray-500 mb-5">Ubah username admin login</p>
+                                <form id="admin-username-form" class="space-y-4" onsubmit="changeAdminUsername(event)">
+                                    <div>
+                                        <label class="text-xs text-gray-400 mb-1 block">Username Baru</label>
+                                        <input type="text" id="admin-new-username" class="input-f" placeholder="username.baru" required minlength="3">
+                                    </div>
+                                    <button type="submit" class="btn-primary w-full">💾 Simpan Username</button>
+                                </form>
+                            </div>
                         </div>
 
                         <!-- Info -->
-                        <div class="glass rounded-2xl p-6">
+                        <div class="glass rounded-2xl p-6 h-fit">
                             <h2 class="font-semibold text-white mb-4 flex items-center gap-2">ℹ️ Informasi Sistem</h2>
                             <div class="space-y-3 text-sm">
                                 <div class="flex justify-between">
