@@ -289,7 +289,8 @@ function switchTab(tabId) {
         guestbook: 'Pesan Singkat',
         settings: 'Pengaturan',
         'my-profile': 'Profil Saya',
-        'my-snapshots': 'My Snapshots'
+        'my-snapshots': 'My Snapshots',
+        'my-memori': 'Memori Kelas'
     };
     document.getElementById('page-title').textContent = titles[tabId] || tabId;
     
@@ -301,7 +302,8 @@ function switchTab(tabId) {
         gallery: loadGallery, 
         guestbook: loadGuestbook,
         'my-profile': loadMyProfile,
-        'my-snapshots': loadMySnapshots 
+        'my-snapshots': loadMySnapshots,
+        'my-memori': loadMyMemori
     };
     if (loaders[tabId]) loaders[tabId]();
     if (window.innerWidth < 768) closeSidebar();
@@ -429,9 +431,9 @@ function renderStudents(students) {
         tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-500">Tidak ada murid ditemukan 😢</td></tr>`;
         return;
     }
-    tbody.innerHTML = students.map(s => {
+    tbody.innerHTML = students.map((s, idx) => {
         const mongoId = s._id ? s._id.toString() : null;
-        const displayId = s.sort_order || s.id || '-';
+        const displayId = idx + 1;
         const editParam = mongoId ? `'${mongoId}'` : s.id;
         return `
         <tr class="table-row">
@@ -440,7 +442,7 @@ function renderStudents(students) {
                     ${getAvatarHtml(s, 38)}
                     <div>
                         <p class="text-white font-semibold text-sm">${escHtml(s.name)}</p>
-                        <p class="text-gray-500 text-xs font-mono">No. ${displayId} ${s.username ? `| @${escHtml(s.username)}` : ''}</p>
+                        <p class="text-gray-500 text-xs font-mono">Absen ${displayId} ${s.username ? `| @${escHtml(s.username)}` : ''}</p>
                     </div>
                 </div>
             </td>
@@ -1476,5 +1478,180 @@ function deleteMySnapshot(id) {
     });
 }
 
+// ── REINDEX STUDENTS ────────────────────────────────────────────
+async function reindexStudents() {
+    if (!confirm('Re-index nomor absen semua murid berdasarkan urutan alfabet (A-Z)?')) return;
+    showLoading();
+    try {
+        const data = await safeFetch('api/students?action=reindex', { method: 'POST' });
+        showToast(data.message || 'Re-index berhasil!');
+        loadStudents();
+    } catch (err) {
+        showToast(err.message || 'Gagal re-index', 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// ── MEMORI KELAS (STUDENT) ─────────────────────────────────────
+let _memoriData = [];
+let _compressedMemoriFile = null;
+
+async function loadMyMemori() {
+    const grid = document.getElementById('my-memori-grid');
+    const quotaInfo = document.getElementById('memori-quota-info');
+    if (!grid) return;
+
+    grid.innerHTML = '<p class="col-span-full text-center text-gray-500 py-12">Memuat foto memori...</p>';
+
+    try {
+        const data = await safeFetch('api/gallery?limit=100');
+        const allItems = data.data || [];
+        const userId = window.CURRENT_USER_ID || window.CURRENT_MONGO_ID;
+        
+        // Filter items uploaded by current user
+        _memoriData = allItems.filter(item => item.uploaded_by === userId);
+
+        // Calculate today's upload count for quota
+        const now = new Date();
+        const todayStr = now.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' });
+        const todayCount = _memoriData.filter(item => {
+            if (!item.created_at) return false;
+            const d = new Date(item.created_at);
+            return d.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' }) === todayStr;
+        }).length;
+        const remaining = Math.max(0, 5 - todayCount);
+
+        if (quotaInfo) {
+            quotaInfo.innerHTML = remaining > 0
+                ? `<span class="text-neon-green">📸 Sisa kuota hari ini: <strong>${remaining}</strong> dari 5 foto</span>`
+                : `<span class="text-red-400">⚠️ Kuota harian habis (5/5). Coba lagi besok!</span>`;
+        }
+
+        if (_memoriData.length === 0) {
+            grid.innerHTML = '<p class="col-span-full text-center text-gray-500 py-12">Belum ada foto memori. Upload foto pertamamu! 📷</p>';
+            return;
+        }
+
+        grid.innerHTML = _memoriData.map(item => {
+            const imgUrl = item.image || `https://placehold.co/400x300/${item.color || '7b2ff7'}/fff?text=Memori`;
+            const dateStr = item.created_at
+                ? new Date(item.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', timeZone: 'Asia/Jakarta' })
+                : '';
+            const itemId = item._id ? item._id.toString() : item.id;
+            
+            return `
+            <div class="glass rounded-xl overflow-hidden group relative">
+                <div class="aspect-square overflow-hidden">
+                    <img src="${imgUrl}" alt="${escHtml(item.title)}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" loading="lazy">
+                </div>
+                <div class="p-3">
+                    <p class="text-white text-sm font-semibold truncate">${escHtml(item.title)}</p>
+                    <p class="text-gray-500 text-xs mt-0.5">${escHtml(item.category || '')} ${dateStr ? '• ' + dateStr : ''}</p>
+                </div>
+                <button onclick="deleteMemori('${itemId}')" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 hover:bg-red-500/80 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" title="Hapus foto ini">🗑️</button>
+            </div>`;
+        }).join('');
+    } catch (err) {
+        grid.innerHTML = '<p class="col-span-full text-center text-red-400 py-12">Gagal memuat data: ' + (err.message || 'Unknown error') + '</p>';
+    }
+}
+
+function openMemoriModal() {
+    _compressedMemoriFile = null;
+    document.getElementById('memori-title').value = '';
+    document.getElementById('memori-category').value = 'keseruan';
+    document.getElementById('memori-img-preview-wrap').innerHTML = '<p class="text-3xl mb-1">📷</p><p class="text-xs text-gray-500">Klik atau drag foto ke sini</p>';
+    const input = document.getElementById('memori-img-input');
+    if (input) input.value = '';
+    openModal('memori-modal');
+}
+
+async function previewMemoriImage(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    
+    try {
+        const result = await compressImage(file, {
+            onProgress: (msg) => {
+                document.getElementById('memori-img-preview-wrap').innerHTML = `<p class="text-xs text-cyber-blue animate-pulse">${msg}</p>`;
+            }
+        });
+        _compressedMemoriFile = result.file || result.blob;
+        document.getElementById('memori-img-preview-wrap').innerHTML = `<img src="${result.dataUrl}" class="max-h-48 mx-auto rounded-lg">`;
+        
+        if (result.compressed) {
+            showToast(`📦 Gambar dikompres: ${(result.originalSize/1024/1024).toFixed(1)}MB → ${(result.newSize/1024/1024).toFixed(1)}MB`);
+        }
+    } catch (err) {
+        showToast('Gagal memproses gambar: ' + err.message, 'error');
+    }
+}
+
+async function saveMemori(e) {
+    e.preventDefault();
+    const title = document.getElementById('memori-title').value.trim();
+    const category = document.getElementById('memori-category').value;
+    const btn = document.getElementById('memori-save-btn');
+    
+    if (!title) return showToast('Judul wajib diisi', 'error');
+    
+    const fileInput = document.getElementById('memori-img-input');
+    const originalFile = fileInput && fileInput.files && fileInput.files[0];
+    if (!originalFile && !_compressedMemoriFile) {
+        return showToast('Pilih foto untuk diupload', 'error');
+    }
+    
+    btn.disabled = true;
+    btn.textContent = '⏳ Mengupload...';
+    showLoading();
+    
+    try {
+        let uploadFile = _compressedMemoriFile || originalFile;
+        
+        if (uploadFile.size > MAX_IMAGE_SIZE) {
+            showToast('📦 Mengompres gambar...', 'info');
+            const result = await compressImage(uploadFile);
+            uploadFile = result.file;
+        }
+        
+        // Convert to base64 for API
+        const base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(uploadFile);
+        });
+        
+        const data = await safeFetch('api/gallery', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, category, image: base64 })
+        });
+        
+        showToast(data.message || 'Foto memori berhasil diupload! 🎉');
+        closeModal('memori-modal');
+        _compressedMemoriFile = null;
+        loadMyMemori();
+    } catch (err) {
+        showToast(err.message || 'Gagal upload foto', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '📤 Upload';
+        hideLoading();
+    }
+}
+
+function deleteMemori(id) {
+    confirmDelete('Yakin hapus foto memori ini?', () => {
+        showLoading();
+        safeFetch(`api/gallery?id=${id}`, { method: 'DELETE' })
+        .then(() => { showToast('Foto berhasil dihapus!'); loadMyMemori(); })
+        .catch(err => showToast(err.message || 'Gagal hapus', 'error'))
+        .finally(() => hideLoading());
+    });
+}
+
 // ── INIT ──────────────────────────────────────────────────────
 updateOverview();
+

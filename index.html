@@ -187,6 +187,7 @@
                         <a href="#struktur" class="nav-link text-text-secondary hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-all relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-gradient-to-r after:from-cyber-blue after:to-electric-purple hover:after:w-full after:transition-all after:duration-300">Struktur</a>
                         <a href="#murid" class="nav-link text-text-secondary hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-all relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-gradient-to-r after:from-cyber-blue after:to-electric-purple hover:after:w-full after:transition-all after:duration-300">Murid</a>
                         <a href="#projek" class="nav-link text-text-secondary hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-all relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-gradient-to-r after:from-cyber-blue after:to-electric-purple hover:after:w-full after:transition-all after:duration-300">Projek</a>
+                        <a href="#memori" class="nav-link text-text-secondary hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-all relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-gradient-to-r after:from-cyber-blue after:to-electric-purple hover:after:w-full after:transition-all after:duration-300">Memori</a>
                         <a href="#guestbook" class="nav-link text-text-secondary hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-all relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-gradient-to-r after:from-cyber-blue after:to-electric-purple hover:after:w-full after:transition-all after:duration-300">Pesan Singkat</a>
                     </div>
                     <!-- Login/Dashboard Button -->
@@ -208,6 +209,7 @@
             <a href="#struktur" class="mobile-nav-link text-2xl font-heading text-text-secondary hover:text-white transition-colors">Struktur Kelas</a>
             <a href="#murid" class="mobile-nav-link text-2xl font-heading text-text-secondary hover:text-white transition-colors">Murid</a>
             <a href="#projek" class="mobile-nav-link text-2xl font-heading text-text-secondary hover:text-white transition-colors">Projek</a>
+            <a href="#memori" class="mobile-nav-link text-2xl font-heading text-text-secondary hover:text-white transition-colors">Memori</a>
             <a href="#guestbook" class="mobile-nav-link text-2xl font-heading text-text-secondary hover:text-white transition-colors">Pesan Singkat</a>
             <div id="mobile-auth-btn"></div>
         </div>
@@ -519,6 +521,7 @@
                 </div>
 
                 <div id="gallery-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 auto-rows-[150px] md:auto-rows-[200px]"></div>
+                <div id="gallery-show-more" class="hidden text-center mt-10 reveal"></div>
             </div>
         </section>
 
@@ -637,8 +640,12 @@
         <button id="lightbox-prev" aria-label="Foto sebelumnya" class="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center z-10 transition-colors focus-outline-none backdrop-blur-sm">❮</button>
         <button id="lightbox-next" aria-label="Foto selanjutnya" class="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center z-10 transition-colors focus-outline-none backdrop-blur-sm">❯</button>
         <div class="absolute inset-0 flex flex-col items-center justify-center p-4 md:p-12 pointer-events-none">
-            <img id="lightbox-img" src="" alt="Foto galeri diperbesar" class="max-w-full max-h-[75vh] object-contain shadow-2xl rounded-sm transform scale-95 opacity-0 transition-all duration-300 pointer-events-auto">
-            <p id="lightbox-caption" class="text-white text-lg mt-6 font-medium text-center opacity-0 transition-opacity duration-300 delay-100"></p>
+            <img id="lightbox-img" src="" alt="Foto galeri diperbesar" class="max-w-full max-h-[65vh] object-contain shadow-2xl rounded-sm transform scale-95 opacity-0 transition-all duration-300 pointer-events-auto">
+            <p id="lightbox-caption" class="text-white text-lg mt-4 font-medium text-center opacity-0 transition-opacity duration-300 delay-100"></p>
+            <p id="lightbox-uploader" class="text-sm mt-1 text-center font-mono"></p>
+            <button id="lightbox-download-btn" class="mt-3 flex items-center gap-2 px-5 py-2 rounded-full bg-white/10 hover:bg-cyber-blue/30 border border-white/20 hover:border-cyber-blue text-white text-sm font-semibold transition-all pointer-events-auto">
+                ⬇️ Download
+            </button>
         </div>
     </div>
 

@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Students
             if (studentRes.status === 'fulfilled' && studentRes.value.data) {
                 studentsData = studentRes.value.data.map((s, i) => ({
-                    id: s.sort_order || (i + 1),
+                    id: i + 1,
                     _id: s._id,
                     name: s.name || s.full_name,
                     quote: s.quote || '',
@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         ${hasPhoto ? `<div class="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-neon-green border-2 border-dark-section z-20 flex items-center justify-center text-[8px]">📷</div>` : ''}
                     </div>
                     <h3 class="text-sm font-semibold text-white truncate px-1">${escHtml(s.name)}</h3>
-                    <p class="text-xs text-text-secondary mt-1 font-mono">No. ${s.id}</p>
+                    <p class="text-xs text-text-secondary mt-1 font-mono">Absen ${s.id}</p>
                 </div>
             `;
         });
@@ -135,17 +135,25 @@ document.addEventListener('DOMContentLoaded', () => {
         initScrollAnimations();
     }
 
-    function renderGallery() {
+    let galleryExpanded = false;
+
+    function renderGallery(showAll = false) {
         const grid = document.getElementById('gallery-grid');
+        const showMoreContainer = document.getElementById('gallery-show-more');
+        const INITIAL_COUNT = 8;
+        const itemsToShow = showAll ? galleryData : galleryData.slice(0, INITIAL_COUNT);
         let html = '';
         
-        galleryData.forEach((item, index) => {
+        itemsToShow.forEach((item, index) => {
             const delay = (index % 4) * 100;
             const cat = item.category || 'event';
             const imgUrl = (item.image && item.image.length > 0)
                 ? item.image
                 : `https://placehold.co/600x600/${item.color || '7b2ff7'}/fff?text=${cat.toUpperCase()}`;
-            const spanCls = item.span || 'col-span-1';
+            
+            // Masonry: item ke-0 dan ke-5 jadi besar (col-span-2 row-span-2)
+            const isBig = (index === 0 || index === 5);
+            const spanCls = isBig ? 'col-span-2 row-span-2' : 'col-span-1';
 
             html += `
                 <div class="gallery-item rounded-xl overflow-hidden cursor-pointer relative group reveal ${spanCls}" data-category="${cat}" data-index="${index}" style="transition-delay: ${delay}ms">
@@ -155,14 +163,56 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="p-3 w-full transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
                             <span class="text-[10px] uppercase font-bold bg-white/20 px-2 py-0.5 rounded backdrop-blur-sm mb-1 inline-block text-white">${cat}</span>
                             <p class="text-sm font-medium text-white leading-tight">${escHtml(item.title)}</p>
+                            ${item.uploader_username ? `<p class="text-[10px] text-white/60 mt-0.5">@${escHtml(item.uploader_username)}</p>` : ''}
                         </div>
                     </div>
                 </div>
             `;
         });
         grid.innerHTML = html;
+
+        // Show/hide "Lebih Banyak" button
+        if (showMoreContainer) {
+            if (galleryData.length > INITIAL_COUNT && !showAll) {
+                showMoreContainer.classList.remove('hidden');
+                showMoreContainer.innerHTML = `
+                    <button onclick="window._expandGallery()" class="group relative inline-flex items-center justify-center px-8 py-3 text-sm font-bold text-white transition-all duration-300 bg-gradient-to-r from-cyber-blue/20 to-electric-purple/20 border border-white/10 rounded-full hover:border-cyber-blue/50 hover:shadow-[0_0_20px_rgba(0,212,255,0.2)] hover:scale-105">
+                        <span>📸 Lebih Banyak (${galleryData.length - INITIAL_COUNT} foto lagi)</span>
+                        <svg class="w-4 h-4 ml-2 group-hover:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>`;
+            } else {
+                showMoreContainer.classList.add('hidden');
+            }
+        }
+
         initScrollAnimations();
     }
+
+    window._expandGallery = function() {
+        galleryExpanded = true;
+        renderGallery(true);
+    };
+
+    // Gallery filter buttons
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.filter-btn').forEach(b => {
+                b.classList.remove('bg-gradient-to-r', 'from-cyber-blue', 'to-electric-purple', 'text-white');
+                b.classList.add('bg-white/5', 'text-text-secondary');
+            });
+            btn.classList.remove('bg-white/5', 'text-text-secondary');
+            btn.classList.add('bg-gradient-to-r', 'from-cyber-blue', 'to-electric-purple', 'text-white');
+            
+            const filter = btn.getAttribute('data-filter');
+            document.querySelectorAll('.gallery-item').forEach(item => {
+                if (filter === 'all' || item.getAttribute('data-category') === filter) {
+                    item.style.display = '';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+    });
 
     function renderProjects() {
         if (!projectsData || projectsData.length === 0) return;
@@ -509,7 +559,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!s) return;
 
         document.getElementById('modal-name').innerText = s.name;
-        document.getElementById('modal-absen').innerText = `No. Absen ${s.id}`;
+        document.getElementById('modal-absen').innerText = `Absen ${s.id}`;
         document.getElementById('modal-quote').innerText = `"${s.quote}"`;
         document.getElementById('modal-motto').innerText = s.motto;
         document.getElementById('modal-dream').innerText = s.dream;
@@ -643,6 +693,24 @@ document.addEventListener('DOMContentLoaded', () => {
             lbImg.src = imgUrl;
             lbCaption.innerText = data.title;
             lbCounter.innerText = `${currentLbIndex + 1} / ${currentVisibleGallery.length}`;
+
+            // Uploader info
+            const lbUploaderEl = document.getElementById('lightbox-uploader');
+            if (lbUploaderEl) {
+                let uploaderHtml = '';
+                if (data.uploader_username) {
+                    uploaderHtml += `<span class="text-cyber-blue">@${escHtml(data.uploader_username)}</span>`;
+                }
+                if (data.created_at) {
+                    const dateStr = new Date(data.created_at).toLocaleString('id-ID', {
+                        day: '2-digit', month: 'short', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit',
+                        timeZone: 'Asia/Jakarta'
+                    });
+                    uploaderHtml += `<span class="text-gray-500 ml-2">• ${dateStr}</span>`;
+                }
+                lbUploaderEl.innerHTML = uploaderHtml;
+            }
             
             lbImg.style.opacity = '1';
             lbCaption.style.opacity = '1';
@@ -693,6 +761,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     lbClose.addEventListener('click', closeLightbox);
     lbOverlay.addEventListener('click', closeLightbox);
+
+    // Gallery lightbox download
+    document.getElementById('lightbox-download-btn').addEventListener('click', () => {
+        const img = document.getElementById('lightbox-img');
+        if (!img.src) return;
+        fetch(img.src)
+            .then(res => {
+                if (!res.ok) throw new Error('Gagal download');
+                return res.blob();
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = `xrpl-memori-${Date.now()}.jpg`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+            })
+            .catch(() => showToast('Gagal mendownload foto', 'error'));
+    });
 
     lbPrev.addEventListener('click', (e) => {
         e.stopPropagation();

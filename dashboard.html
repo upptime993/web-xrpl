@@ -169,6 +169,9 @@
                 <button class="sidebar-link student-only hidden" data-tab="my-snapshots" onclick="switchTab('my-snapshots')">
                     <span class="icon">📷</span> My Snapshots
                 </button>
+                <button class="sidebar-link student-only hidden" data-tab="my-memori" onclick="switchTab('my-memori')">
+                    <span class="icon">🖼️</span> Memori Kelas
+                </button>
                 <button class="sidebar-link student-only hidden" data-tab="settings" onclick="switchTab('settings')">
                     <span class="icon">⚙️</span> Pengaturan
                 </button>
@@ -267,9 +270,14 @@
                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">🔍</span>
                         <input type="text" id="search-students" class="input-f pl-9" placeholder="Cari nama murid...">
                     </div>
-                    <button class="btn-primary flex items-center gap-2" onclick="openStudentModal()">
-                        ➕ Tambah Murid
-                    </button>
+                    <div class="flex gap-2">
+                        <button class="btn-primary flex items-center gap-2" onclick="openStudentModal()">
+                            ➕ Tambah Murid
+                        </button>
+                        <button class="btn-edit flex items-center gap-2 text-xs" onclick="reindexStudents()" title="Re-number nomor absen semua murid (urut alfabet A-Z)">
+                            🔄 Re-index Absen
+                        </button>
+                    </div>
                 </div>
 
                 <div class="glass rounded-2xl overflow-hidden">
@@ -569,11 +577,66 @@
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="my-snapshots-grid"></div>
             </div>
 
+            <!-- ==================== MEMORI KELAS (STUDENT) ==================== -->
+            <div class="tab-content" id="tab-my-memori">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                    <div>
+                        <h2 class="text-white font-semibold">🖼️ Memori Kelas</h2>
+                        <p class="text-xs text-gray-400">Upload foto memori atau kenangan kelas. Maks 5 foto per hari.</p>
+                        <p class="text-xs mt-1" id="memori-quota-info"><span class="text-neon-green">⏳ Memuat kuota...</span></p>
+                    </div>
+                    <button class="btn-primary flex items-center gap-2" onclick="openMemoriModal()">
+                        ➕ Upload Memori
+                    </button>
+                </div>
+                
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" id="my-memori-grid"></div>
+            </div>
+
         </main>
     </div>
 </div>
 
 <!-- ==================== MODALS ==================== -->
+
+<!-- Memori Upload Modal (Student) -->
+<div class="modal-bg" id="memori-modal">
+    <div class="modal-card">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-white font-heading font-bold text-lg">Upload Memori Kelas</h2>
+            <button onclick="closeModal('memori-modal')" class="w-8 h-8 rounded-lg bg-white/5 text-gray-400 flex items-center justify-center">✕</button>
+        </div>
+        <form id="memori-form" class="space-y-4" onsubmit="saveMemori(event)">
+            <div>
+                <label class="text-xs text-gray-400 mb-1 block">Judul Foto *</label>
+                <input type="text" id="memori-title" class="input-f" placeholder="Contoh: Foto bareng di kantin" required>
+            </div>
+            <div>
+                <label class="text-xs text-gray-400 mb-1 block">Kategori</label>
+                <select id="memori-category" class="input-f">
+                    <option value="keseruan">Keseruan</option>
+                    <option value="belajar">Kegiatan Belajar</option>
+                    <option value="event">Event</option>
+                    <option value="candid">Candid</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs text-gray-400 mb-1 block">Upload Foto *</label>
+                <div class="upload-zone" id="memori-upload-zone" onclick="document.getElementById('memori-img-input').click()">
+                    <input type="file" id="memori-img-input" accept="image/*" class="hidden" required onchange="previewMemoriImage(this)">
+                    <div id="memori-img-preview-wrap">
+                        <p class="text-3xl mb-1">📷</p>
+                        <p class="text-xs text-gray-500">Klik atau drag foto ke sini</p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeModal('memori-modal')" class="flex-1 py-2.5 rounded-xl border border-white/10 text-gray-400 text-sm">Batal</button>
+                <button type="submit" class="flex-1 btn-primary" id="memori-save-btn">📤 Upload</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <!-- Snapshot Modal (Student) -->
 <div class="modal-bg" id="snapshot-modal">
