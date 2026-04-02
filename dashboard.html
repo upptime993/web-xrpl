@@ -768,20 +768,9 @@
     </div>
 </div>
 
-<script>
-    window.showLoader = function() {
-        const l = document.getElementById('global-loader');
-        if(!l) return;
-        l.classList.remove('hidden');
-        setTimeout(() => l.classList.remove('opacity-0'), 10);
-    };
-    window.hideLoader = function() {
-        const l = document.getElementById('global-loader');
-        if(!l) return;
-        l.classList.add('opacity-0');
-        setTimeout(() => { if(l.classList.contains('opacity-0')) l.classList.add('hidden'); }, 300);
-    };
-</script>
+<script src="js/ui.js"></script>
+<script src="js/api.js"></script>
+<script src="js/state.js"></script>
 <script src="dashboard.js"></script>
 </body>
 </html>
