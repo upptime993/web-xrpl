@@ -2,7 +2,6 @@ import getDB from './_db.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { serialize, parse } from 'cookie';
-import { verifyAuth } from './_auth.js';
 
 const SECRET_KEY = process.env.JWT_SECRET || 'xrpl2024-secret-key-super-rahasia';
 
@@ -36,7 +35,7 @@ export default async function handler(req, res) {
 
             // Jika form tidak mengirim apa-apa
             if (!username || !password) {
-                return res.status(400).json({ success: false, error: 'System: Username atau Password kosong terbaca di server!' });
+                return res.status(400).json({ success: false, message: 'System: Username atau Password kosong terbaca di server!' });
             }
 
             const db = await getDB();
@@ -62,35 +61,30 @@ export default async function handler(req, res) {
                     res.setHeader('Set-Cookie', serialize('xrpl_token', newToken, { path: '/', httpOnly: true, maxAge: 604800 }));
                     return res.status(200).json({ success: true, message: 'Login berhasil', user: userData });
                 } else {
-                    return res.status(401).json({ success: false, error: 'System: Password yang kamu masukkan salah!' });
+                    return res.status(401).json({ success: false, message: 'System: Password yang kamu masukkan salah!' });
                 }
             } else {
-                return res.status(404).json({ success: false, error: `System: Username '${username}' tidak ditemukan di database MongoDB!` });
+                return res.status(404).json({ success: false, message: `System: Username '${username}' tidak ditemukan di database MongoDB!` });
             }
 
         } catch (error) {
             // Menangkap jika ada error kodingan
-            console.error("POST /api/auth Error:", error);
-            return res.status(500).json({ success: false, error: 'Server Error: ' + error.message });
+            return res.status(500).json({ success: false, message: 'Server Error: ' + error.message });
         }
     }
 
     // --- PUT: RESET PASSWORD MURID ---
     if (method === 'PUT') {
-        const currentUser = verifyAuth(req, res, ['admin']);
-        // verifyAuth handles returning 401/403 directly if fails
-        if (!currentUser) return; 
-
         try {
             let body = req.body;
             if (typeof body === 'string') body = JSON.parse(body);
 
             const { username, newPassword } = body;
             if (!username || !newPassword) {
-                return res.status(400).json({ success: false, error: 'Username dan password baru wajib diisi' });
+                return res.status(400).json({ success: false, message: 'Username dan password baru wajib diisi' });
             }
             if (newPassword.length < 6) {
-                return res.status(400).json({ success: false, error: 'Password minimal 6 karakter' });
+                return res.status(400).json({ success: false, message: 'Password minimal 6 karakter' });
             }
 
             const db = await getDB();
@@ -98,7 +92,7 @@ export default async function handler(req, res) {
             // Cari murid berdasarkan username
             const student = await db.collection('students').findOne({ username: username });
             if (!student) {
-                return res.status(404).json({ success: false, error: `Username '${username}' tidak ditemukan di database` });
+                return res.status(404).json({ success: false, message: `Username '${username}' tidak ditemukan di database` });
             }
 
             // Hash password baru dan update
@@ -110,8 +104,7 @@ export default async function handler(req, res) {
 
             return res.status(200).json({ success: true, message: `Password @${username} berhasil direset!` });
         } catch (error) {
-            console.error("PUT /api/auth Error:", error);
-            return res.status(500).json({ success: false, error: 'Server Error: ' + error.message });
+            return res.status(500).json({ success: false, message: 'Server Error: ' + error.message });
         }
     }
 
@@ -121,5 +114,5 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, message: 'Logout berhasil.' });
     }
 
-    return res.status(405).json({ success: false, error: 'Method Not Allowed' });
+    return res.status(405).json({ message: 'Method Not Allowed' });
 }
