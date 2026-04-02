@@ -73,6 +73,41 @@ export default async function handler(req, res) {
         }
     }
 
+    // --- PUT: RESET PASSWORD MURID ---
+    if (method === 'PUT') {
+        try {
+            let body = req.body;
+            if (typeof body === 'string') body = JSON.parse(body);
+
+            const { username, newPassword } = body;
+            if (!username || !newPassword) {
+                return res.status(400).json({ success: false, message: 'Username dan password baru wajib diisi' });
+            }
+            if (newPassword.length < 6) {
+                return res.status(400).json({ success: false, message: 'Password minimal 6 karakter' });
+            }
+
+            const db = await getDB();
+            
+            // Cari murid berdasarkan username
+            const student = await db.collection('students').findOne({ username: username });
+            if (!student) {
+                return res.status(404).json({ success: false, message: `Username '${username}' tidak ditemukan di database` });
+            }
+
+            // Hash password baru dan update
+            const hashedPassword = bcrypt.hashSync(newPassword, 10);
+            await db.collection('students').updateOne(
+                { username: username },
+                { $set: { password: hashedPassword, updated_at: new Date() } }
+            );
+
+            return res.status(200).json({ success: true, message: `Password @${username} berhasil direset!` });
+        } catch (error) {
+            return res.status(500).json({ success: false, message: 'Server Error: ' + error.message });
+        }
+    }
+
     // --- DELETE: LOGOUT ---
     if (method === 'DELETE') {
         res.setHeader('Set-Cookie', serialize('xrpl_token', '', { path: '/', maxAge: -1 }));
