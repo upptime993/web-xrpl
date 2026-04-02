@@ -133,6 +133,9 @@
             <a href="index.html" class="text-gray-500 hover:text-cyber-blue text-sm transition-colors">
                 ← Kembali ke Website
             </a>
+            <a href="setup.html" class="block mt-2 text-gray-600 hover:text-white text-xs transition-colors">
+                Setup Database
+            </a>
         </div>
     </div>
 
@@ -191,15 +194,22 @@
     })();
 
     // ============================================================
-    // Login Logic (localStorage-based, upgradeable to PHP)
+    // Login Logic
     // ============================================================
-    const ADMIN_CREDENTIALS = { username: 'admin', password: 'admin123' };
+
+    // BUGFIX: toggleHint() harus di scope GLOBAL agar bisa dipanggil dari onclick di HTML
+    function toggleHint() {
+        const el = document.getElementById('student-hint');
+        const arrow = document.getElementById('hint-arrow');
+        el.classList.toggle('hidden');
+        arrow.textContent = el.classList.contains('hidden') ? '▼' : '▲';
+    }
 
     function showError(msg) {
         const el = document.getElementById('error-msg');
         document.getElementById('error-text').textContent = msg;
         el.classList.add('show');
-        setTimeout(() => el.classList.remove('show'), 4000);
+        setTimeout(() => el.classList.remove('show'), 5000);
     }
 
     // Toggle password visibility
@@ -217,14 +227,7 @@
         window.location.href = 'dashboard.html';
     }
 
-    function toggleHint() {
-        const el = document.getElementById('student-hint');
-        const arrow = document.getElementById('hint-arrow');
-        el.classList.toggle('hidden');
-        arrow.textContent = el.classList.contains('hidden') ? '▼' : '▲';
-    }
-
-    // Form submit
+    // Form submit — login ke MongoDB via API
     document.getElementById('login-form').addEventListener('submit', function(e) {
         e.preventDefault();
         const username = document.getElementById('username').value.trim();
@@ -238,48 +241,6 @@
         btnText.classList.add('hidden');
         btnLoader.classList.remove('hidden');
 
-        // Fungsi sukses
-        const onLoginSuccess = (user_data) => {
-            localStorage.setItem('xrpl_admin_logged_in', 'true');
-            localStorage.setItem('xrpl_admin_user', JSON.stringify(user_data));
-            btnText.textContent = '✅ Berhasil! Mengalihkan...';
-            btnText.classList.remove('hidden'); btnLoader.classList.add('hidden');
-            setTimeout(() => { window.location.href = 'dashboard.html'; }, 800);
-        };
-
-        // Fungsi local login check fallback
-        const checkLocalLogin = () => {
-            // Cek Admin (fallback localStorage / default)
-            const savedCreds = JSON.parse(localStorage.getItem('xrpl_admin_credentials'));
-            const adminUser = savedCreds ? savedCreds.username : ADMIN_CREDENTIALS.username;
-            const adminPass = savedCreds ? savedCreds.password : ADMIN_CREDENTIALS.password;
-
-            if (username === adminUser && password === adminPass) {
-                return onLoginSuccess({ id: 0, username: adminUser, full_name: 'Administrator Kelas', role: 'admin' });
-            }
-
-            // Cek Murid (fallback localStorage)
-            if (password === 'murid123') {
-                const studentsData = localStorage.getItem('xrpl_students_db');
-                if (studentsData) {
-                    const students = JSON.parse(studentsData);
-                    const stdName = username.replace('.', ' ').toLowerCase();
-                    const found = students.find(s => s.name && s.name.toLowerCase() === stdName);
-                    if (found) {
-                        return onLoginSuccess({ id: found.id, username: username, full_name: found.name, role: 'student' });
-                    }
-                } else if (username.includes('.')) {
-                    // Beri akses mock jika DB kosong & format benar
-                    const mockName = username.split('.').map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(' ');
-                    return onLoginSuccess({ id: Math.floor(Math.random() * 100) + 1, username: username, full_name: mockName, role: 'student' });
-                }
-            }
-
-            showError('Username atau password salah.');
-            btn.disabled = false;
-            btnText.classList.remove('hidden'); btnLoader.classList.add('hidden');
-        };
-
         fetch('api/auth', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -288,7 +249,12 @@
         .then(res => res.json())
         .then(data => {
             if (data.success) {
-                onLoginSuccess(data.user);
+                localStorage.setItem('xrpl_admin_logged_in', 'true');
+                localStorage.setItem('xrpl_admin_user', JSON.stringify(data.user));
+                
+                btnText.textContent = '✅ Berhasil! Mengalihkan...';
+                btnText.classList.remove('hidden'); btnLoader.classList.add('hidden');
+                setTimeout(() => { window.location.href = 'dashboard.html'; }, 800);
             } else {
                 showError(data.message || 'Username atau password salah.');
                 btn.disabled = false;
@@ -296,8 +262,10 @@
             }
         })
         .catch(err => {
-            console.warn('API connection failed, falling back to local auth... (' + err.message + ')');
-            checkLocalLogin();
+            console.error(err);
+            showError('Terjadi kesalahan koneksi. Pastikan MONGODB_URI sudah di-set di Vercel Environment Variables.');
+            btn.disabled = false;
+            btnText.classList.remove('hidden'); btnLoader.classList.add('hidden');
         });
     });
 

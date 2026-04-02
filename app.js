@@ -6,62 +6,82 @@ document.addEventListener('DOMContentLoaded', () => {
     let galleryData = [];
     let projectsData = [];
 
-    // Ambil data: coba dari localStorage (dashboard) dulu, fallback ke data.json
+    // Ambil data: selalu dari MongoDB API (real-time), fallback ke data.json
     async function loadData() {
         try {
-            // Fetch dari API secara paralel
-            const [resStudents, resGallery, resProjects] = await Promise.all([
-                fetch('api/students').catch(() => null),
-                fetch('api/gallery').catch(() => null),
-                fetch('api/projects').catch(() => null)
-            ]);
+            // Selalu fetch dari MongoDB API agar data selalu real-time
+            // (tidak lagi bergantung pada localStorage yang hanya lokal browser)
+            const studentRes = await fetch('api/students');
+            const studentJson = await studentRes.json();
 
-            let fallbackToLocal = false;
+            if (studentJson.success && studentJson.data && studentJson.data.length > 0) {
+                // Map data MongoDB ke format yang dipakai app.js
+                // MongoDB pakai _id (ObjectId), tapi kode lama pakai id (number) dan sort_order
+                studentsData = studentJson.data.map(s => ({
+                    id: s.sort_order || parseInt(s._id.toString().slice(-4), 16) % 100 || 1,
+                    _id: s._id,
+                    name: s.name || s.full_name,
+                    quote: s.quote || '',
+                    motto: s.motto || '',
+                    dream: s.dream || '',
+                    color: s.color || '00d4ff',
+                    photo: s.photo || null
+                }));
 
-            if (resStudents && resStudents.ok) {
-                const sData = await resStudents.json();
-                studentsData = sData.data || [];
-            } else fallbackToLocal = true;
+                // Gallery & projek masih dari localStorage atau data.json (belum ada API-nya)
+                const lsGallery  = localStorage.getItem('xrpl_gallery_db');
+                const lsProjects = localStorage.getItem('xrpl_projects_db');
+                galleryData  = lsGallery  ? JSON.parse(lsGallery)  : [];
+                projectsData = lsProjects ? JSON.parse(lsProjects) : [];
 
-            if (resGallery && resGallery.ok) {
-                const gData = await resGallery.json();
-                galleryData = gData.data || [];
-            } else fallbackToLocal = true;
-
-            if (resProjects && resProjects.ok) {
-                const pData = await resProjects.json();
-                projectsData = pData.data || [];
-            } else fallbackToLocal = true;
-
-            if (fallbackToLocal && studentsData.length === 0) {
-                // Gunakan default.json jika API benar-benar mati
-                const res = await fetch('data.json').catch(e=>({ok:false}));
-                if (res.ok) {
-                    const localData = await res.json();
-                    studentsData = localData.students || [];
-                    galleryData = localData.gallery || [];
-                    projectsData = localData.projects || []; // kalau ada
-                } else {
-                    // Coba local storage
-                    studentsData = JSON.parse(localStorage.getItem('xrpl_students_db') || '[]');
-                    galleryData = JSON.parse(localStorage.getItem('xrpl_gallery_db') || '[]');
-                    projectsData = JSON.parse(localStorage.getItem('xrpl_projects_db') || '[]');
+                // Jika gallery masih kosong, ambil dari data.json
+                if (galleryData.length === 0) {
+                    try {
+                        const fallback = await fetch('data.json');
+                        const fallbackData = await fallback.json();
+                        galleryData = fallbackData.gallery || [];
+                    } catch(e) { galleryData = []; }
                 }
-            }
 
-            renderStudents();
-            renderGallery();
-            renderProjects();
-            hilangkanLoadingScreen();
+                renderStudents();
+                renderGallery();
+                renderProjects();
+                hilangkanLoadingScreen();
+            } else {
+                // Fallback: fetch dari data.json jika MongoDB kosong atau belum di-setup
+                const response = await fetch('data.json');
+                if (!response.ok) throw new Error('Gagal memuat data');
+                const data = await response.json();
+                studentsData = data.students;
+                galleryData  = data.gallery;
+                projectsData = [];
+                renderStudents();
+                renderGallery();
+                hilangkanLoadingScreen();
+            }
         } catch (error) {
             console.error("Error memuat data:", error);
+            // Fallback ke localStorage jika semua gagal
+            try {
+                const lsStudents = localStorage.getItem('xrpl_students_db');
+                const lsGallery  = localStorage.getItem('xrpl_gallery_db');
+                if (lsStudents) studentsData = JSON.parse(lsStudents);
+                if (lsGallery)  galleryData  = JSON.parse(lsGallery);
+                if (studentsData.length > 0 || galleryData.length > 0) {
+                    renderStudents();
+                    renderGallery();
+                    hilangkanLoadingScreen();
+                    return;
+                }
+            } catch(e) {}
             document.getElementById('loading-screen').innerHTML = `
                 <div class="text-center">
                     <h1 class="text-white text-2xl mb-4">Oops! Gagal memuat data.</h1>
-                    <p class="text-text-secondary">Pastikan koneksi server API menyala.</p>
+                    <p class="text-text-secondary">Pastikan kamu membukanya lewat Local Server (Live Server), bukan klik 2x file HTML-nya.</p>
                 </div>`;
         }
     }
+
 
     // ==========================================
     // 2. RENDER FUNGSI (UI GENERATION)
@@ -181,13 +201,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     // 3. FITUR BUKU TAMU (LOCALSTORAGE)
     // ==========================================
-    async function initGuestbook() {
+    function initGuestbook() {
         const form = document.getElementById('guestbook-form');
         const list = document.getElementById('guestbook-list');
         const emptyMsg = document.getElementById('gb-empty');
 
-        const escHtml = (str) => String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        let messages = [];
+        let messages = JSON.parse(localStorage.getItem('xrpl_guestbook')) || [];
 
         const renderMessages = () => {
             if (messages.length === 0) {
@@ -197,35 +216,20 @@ document.addEventListener('DOMContentLoaded', () => {
             emptyMsg.style.display = 'none';
             Array.from(list.children).forEach(child => { if (child.id !== 'gb-empty') child.remove(); });
             
-            messages.forEach(msg => {
+            messages.slice().reverse().forEach(msg => {
                 const div = document.createElement('div');
                 div.className = 'bg-white/5 p-4 rounded-xl border border-white/10 mb-3 animate-fade-in-up';
                 div.innerHTML = `
-                    <h4 class="font-bold text-cyber-blue text-sm">${escHtml(msg.name)}</h4>
-                    <p class="text-text-secondary text-sm mt-1 break-words">${escHtml(msg.text)}</p>
-                    <span class="text-[10px] text-white/30 mt-2 block">${escHtml(msg.date)}</span>
+                    <h4 class="font-bold text-cyber-blue text-sm">${msg.name}</h4>
+                    <p class="text-text-secondary text-sm mt-1 break-words">${msg.text}</p>
+                    <span class="text-[10px] text-white/30 mt-2 block">${msg.date}</span>
                 `;
                 list.appendChild(div);
             });
         };
 
-        // Fetch API
-        try {
-            const res = await fetch('api/guestbook');
-            if (res.ok) {
-                const json = await res.json();
-                messages = json.data || [];
-            } else {
-                messages = JSON.parse(localStorage.getItem('xrpl_guestbook') || '[]');
-            }
-        } catch {
-            messages = JSON.parse(localStorage.getItem('xrpl_guestbook') || '[]');
-        }
-        renderMessages();
-
-        form.addEventListener('submit', async (e) => {
+        form.addEventListener('submit', (e) => {
             e.preventDefault();
-            const btn = form.querySelector('button');
             const nameInput = document.getElementById('gb-name');
             const msgInput = document.getElementById('gb-message');
             
@@ -235,28 +239,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 date: new Date().toLocaleDateString('id-ID', { hour: '2-digit', minute:'2-digit' })
             };
 
-            btn.disabled = true;
-            try {
-                const res = await fetch('api/guestbook', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(newMsg)
-                });
-                if(res.ok) {
-                    messages.unshift(newMsg);
-                    nameInput.value = '';
-                    msgInput.value = '';
-                    renderMessages();
-                }
-            } catch(err) {
-                messages.unshift(newMsg);
-                localStorage.setItem('xrpl_guestbook', JSON.stringify(messages));
-                nameInput.value = '';
-                msgInput.value = '';
-                renderMessages();
-            }
-            btn.disabled = false;
+            messages.push(newMsg);
+            localStorage.setItem('xrpl_guestbook', JSON.stringify(messages));
+            
+            nameInput.value = '';
+            msgInput.value = '';
+            renderMessages();
         });
+
+        renderMessages();
     }
 
     // ==========================================
@@ -517,13 +508,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             })
             .catch(() => {
-                let miniGalleryHTML = '';
-                const pColors = ['7b2ff7','00d4ff','00ff88','ff00aa','ffae00','6c5ce7'];
-                for(let i=0; i<6; i++) {
-                    const pc = pColors[(s.id + i) % 6];
-                    miniGalleryHTML += `<div class="aspect-square rounded-lg overflow-hidden bg-white/5"><img src="https://placehold.co/200x200/${pc}/fff?text=\\ud83d\\udcf7" alt="Kenangan ${i+1}" class="w-full h-full object-cover opacity-70 hover:opacity-100 hover:scale-110 transition-all duration-300"></div>`;
-                }
-                document.getElementById('modal-gallery').innerHTML = miniGalleryHTML;
+                document.getElementById('modal-gallery').innerHTML = '<div class="col-span-3 text-center py-4 text-gray-500 text-xs text-red-400">Gagal mengambil foto. Pastikan koneksi server nyala.</div>';
             });
 
         lastFocusedElement = document.activeElement;

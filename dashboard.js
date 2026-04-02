@@ -101,26 +101,7 @@ const DEFAULT_GALLERY = [
     { id: 12, title: "Foto Bersama Formasi Lengkap", category: "event", color: "d63031", image: null }
 ];
 
-// ── API & STORAGE HELPERS ────────────────────────────────────
-async function apiCall(endpoint, method = 'GET', body = null) {
-    try {
-        const options = { method, headers: {} };
-        if (body) {
-            options.headers['Content-Type'] = 'application/json';
-            options.body = JSON.stringify(body);
-        }
-        const res = await fetch(`api/${endpoint}`, options);
-        if (res.ok) return await res.json();
-        return null;
-    } catch (e) { console.error('API Error:', e); return null; }
-}
-
-async function getApiData(endpoint, defaults) {
-    const res = await apiCall(endpoint);
-    return (res && res.data) ? res.data : (JSON.parse(localStorage.getItem('xrpl_' + endpoint + '_db')) || defaults);
-}
-
-// Fallback legacy (untuk yang belum ter-migrate API atau guestbook old style)
+// ── STORAGE HELPERS ──────────────────────────────────────────
 function getData(key, defaults) {
     const raw = localStorage.getItem('xrpl_' + key);
     if (!raw) { localStorage.setItem('xrpl_' + key, JSON.stringify(defaults)); return JSON.parse(JSON.stringify(defaults)); }
@@ -217,14 +198,11 @@ function getImgSrc(s, type = 'student') {
 }
 
 // ── OVERVIEW ──────────────────────────────────────────────────
-async function updateOverview() {
-    const [students, projects, gallery, gbRes] = await Promise.all([
-        getApiData('students', DEFAULT_STUDENTS),
-        getApiData('projects', DEFAULT_PROJECTS),
-        getApiData('gallery', DEFAULT_GALLERY),
-        apiCall('guestbook')
-    ]);
-    const guestbook = (gbRes && gbRes.data) ? gbRes.data : JSON.parse(localStorage.getItem('xrpl_guestbook') || '[]');
+function updateOverview() {
+    const students = getData('students_db', DEFAULT_STUDENTS);
+    const projects = getData('projects_db', DEFAULT_PROJECTS);
+    const gallery  = getData('gallery_db', DEFAULT_GALLERY);
+    const guestbook = JSON.parse(localStorage.getItem('xrpl_guestbook') || '[]');
 
     document.getElementById('ov-students').textContent = students.length;
     document.getElementById('ov-projects').textContent = projects.length;
@@ -236,13 +214,13 @@ async function updateOverview() {
     document.getElementById('info-projects').textContent = projects.length;
 
     const recentEl = document.getElementById('ov-recent-messages');
-    const recent = guestbook.slice().slice(0, 4); // guestbook API returns sorted DESC
+    const recent = guestbook.slice().reverse().slice(0, 4);
     if (recent.length === 0) {
         recentEl.innerHTML = '<p class="text-gray-500 text-sm italic text-center py-6">Belum ada pesan</p>';
     } else {
         recentEl.innerHTML = recent.map(m => `
             <div class="flex gap-3 items-start border border-white/5 rounded-xl p-3">
-                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyber-blue/30 to-electric-purple/30 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">${(m.name||'?')[0].toUpperCase()}</div>
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyber-blue/30 to-electric-purple/30 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">${m.name[0].toUpperCase()}</div>
                 <div class="min-w-0">
                     <div class="flex items-baseline gap-2"><span class="text-white text-sm font-semibold">${escHtml(m.name)}</span><span class="text-gray-500 text-xs">${m.date}</span></div>
                     <p class="text-gray-400 text-xs mt-0.5 truncate">${escHtml(m.text)}</p>
@@ -252,32 +230,67 @@ async function updateOverview() {
     }
 }
 
-// ── STUDENTS ──────────────────────────────────────────────────
-let cachedStudents = [];
+// ── STUDENTS (pakai MongoDB API, bukan localStorage) ───────────
+let _studentsCache = []; // Cache data murid dari API
 
-async function loadStudents() {
-    cachedStudents = await getApiData('students', DEFAULT_STUDENTS);
-    renderStudents(cachedStudents);
+function loadStudents() {
+    showToast('Memuat data murid...', 'info');
+    fetch('api/students')
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                _studentsCache = data.data;
+                renderStudents(_studentsCache);
+                // Update localStorage juga agar halaman depan bisa pakai sebagai fallback
+                const mapped = _studentsCache.map(s => ({
+                    id: s.sort_order || 1,
+                    _mongoId: s._id,
+                    name: s.name,
+                    quote: s.quote || '',
+                    motto: s.motto || '',
+                    dream: s.dream || '',
+                    color: s.color || '00d4ff',
+                    photo: s.photo || null
+                }));
+                localStorage.setItem('xrpl_students_db', JSON.stringify(mapped));
+                updateOverview();
+            } else {
+                showToast('Gagal memuat murid: ' + data.message, 'error');
+            }
+        })
+        .catch(err => {
+            showToast('Koneksi database gagal. Menggunakan data lokal...', 'error');
+            // Fallback ke localStorage jika API gagal
+            const students = getData('students_db', DEFAULT_STUDENTS);
+            _studentsCache = students;
+            renderStudents(students);
+        });
+
     document.getElementById('search-students').oninput = function() {
         const term = this.value.toLowerCase();
-        renderStudents(cachedStudents.filter(s => s.name.toLowerCase().includes(term)));
+        renderStudents(_studentsCache.filter(s => (s.name || '').toLowerCase().includes(term)));
     };
 }
 
 function renderStudents(students) {
     const tbody = document.getElementById('students-tbody');
-    if (students.length === 0) {
+    if (!students || students.length === 0) {
         tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-500">Tidak ada murid ditemukan 😢</td></tr>`;
         return;
     }
-    tbody.innerHTML = students.map(s => `
+    tbody.innerHTML = students.map(s => {
+        // Support format MongoDB (_id) dan format lama (id numerik)
+        const mongoId = s._id ? s._id.toString() : null;
+        const displayId = s.sort_order || s.id || '-';
+        const editParam = mongoId ? `'${mongoId}'` : s.id;
+        return `
         <tr class="table-row">
             <td class="p-4">
                 <div class="flex items-center gap-3">
                     ${getAvatarHtml(s, 38)}
                     <div>
                         <p class="text-white font-semibold text-sm">${escHtml(s.name)}</p>
-                        <p class="text-gray-500 text-xs font-mono">No. ${s.id}</p>
+                        <p class="text-gray-500 text-xs font-mono">No. ${displayId} ${s.username ? `| @${escHtml(s.username)}` : ''}</p>
                     </div>
                 </div>
             </td>
@@ -294,12 +307,13 @@ function renderStudents(students) {
             </td>
             <td class="p-4 text-right">
                 <div class="flex gap-2 justify-end">
-                    <button class="btn-edit" onclick="editStudent(${s.id})">✏️ Edit</button>
-                    <button class="btn-danger" onclick="deleteStudent(${s.id})">🗑️</button>
+                    <button class="btn-edit" onclick="editStudent(${editParam})">✏️ Edit</button>
+                    <button class="btn-danger" onclick="deleteStudent(${editParam})">🗑️</button>
                 </div>
             </td>
         </tr>
-    `).join('');
+        `;
+    }).join('');
 }
 
 let currentStudentColor = '00d4ff';
@@ -315,10 +329,16 @@ function openStudentModal(studentId = null) {
     setStudentColor('00d4ff', document.querySelector('.color-pick[data-color="00d4ff"]'));
 
     if (studentId) {
-        const s = cachedStudents.find(x => x.id === studentId);
+        // Cari dari cache MongoDB (support ObjectId string atau id numerik)
+        const s = _studentsCache.find(x =>
+            (x._id && x._id.toString() === String(studentId)) ||
+            (x.id === studentId)
+        ) || getData('students_db', DEFAULT_STUDENTS).find(x => x.id === studentId);
         if (!s) return;
-        document.getElementById('student-id').value = s.id;
-        document.getElementById('student-name').value = s.name;
+
+        // Simpan ObjectId MongoDB (atau id numerik) di hidden field
+        document.getElementById('student-id').value = s._id ? s._id.toString() : (s.id || '');
+        document.getElementById('student-name').value = s.name || '';
         document.getElementById('student-dream').value = s.dream || '';
         document.getElementById('student-motto').value = s.motto || '';
         document.getElementById('student-quote').value = s.quote || '';
@@ -362,10 +382,9 @@ function setStudentColor(color, el) {
     if (el) el.style.borderColor = '#fff';
 }
 
-document.getElementById('student-form').addEventListener('submit', async function(e) {
+document.getElementById('student-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    const btn = document.querySelector('#student-form button[type="submit"]');
-    const id = parseInt(document.getElementById('student-id').value);
+    const mongoId = document.getElementById('student-id').value.trim(); // bisa '' (baru) atau ObjectId string
     const data = {
         name: document.getElementById('student-name').value.trim(),
         dream: document.getElementById('student-dream').value.trim(),
@@ -376,39 +395,74 @@ document.getElementById('student-form').addEventListener('submit', async functio
     };
     if (!data.name) return showToast('Nama murid wajib diisi!', 'error');
 
-    btn.disabled = true;
-    if (id) {
-        data.id = id;
-        await apiCall('students', 'PUT', data);
-        showToast(`Data ${data.name} berhasil diperbarui!`);
+    const btn = this.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = true;
+
+    if (mongoId) {
+        // UPDATE murid yang sudah ada
+        fetch(`api/students?id=${mongoId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (btn) btn.disabled = false;
+            if (res.success) {
+                showToast(`Data ${data.name} berhasil diperbarui!`);
+                closeModal('student-modal');
+                loadStudents();
+            } else {
+                showToast(res.message || 'Gagal update murid.', 'error');
+            }
+        })
+        .catch(() => { if (btn) btn.disabled = false; showToast('Koneksi gagal.', 'error'); });
     } else {
-        data.id = nextId(cachedStudents);
-        await apiCall('students', 'POST', data);
-        showToast(`${data.name} berhasil ditambahkan!`);
+        // TAMBAH murid baru
+        fetch('api/students', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (btn) btn.disabled = false;
+            if (res.success) {
+                showToast(`✅ ${res.message}`);
+                closeModal('student-modal');
+                loadStudents();
+            } else {
+                showToast(res.message || 'Gagal menambah murid.', 'error');
+            }
+        })
+        .catch(() => { if (btn) btn.disabled = false; showToast('Koneksi gagal.', 'error'); });
     }
-    btn.disabled = false;
-    closeModal('student-modal');
-    updateOverview();
-    loadStudents();
 });
 
 function deleteStudent(id) {
-    const s = cachedStudents.find(x => x.id === id);
-    confirmDelete(`Hapus murid "${s?.name}"? Data tidak bisa dikembalikan.`, async () => {
-        await apiCall(`students?id=${id}`, 'DELETE');
-        updateOverview();
-        loadStudents();
-        showToast('Murid berhasil dihapus.');
+    // id bisa ObjectId string atau number
+    const student = _studentsCache.find(x => (x._id && x._id.toString() === String(id)) || x.id === id);
+    const name = student ? student.name : 'Murid ini';
+    confirmDelete(`Hapus murid "${name}"? Aksi ini tidak bisa dibatalkan.`, () => {
+        fetch(`api/students?id=${id}`, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                showToast('Murid berhasil dihapus.');
+                loadStudents();
+            } else {
+                showToast(res.message || 'Gagal menghapus murid.', 'error');
+            }
+        })
+        .catch(() => showToast('Koneksi gagal.', 'error'));
     });
 }
 
 // ── STRUKTUR ──────────────────────────────────────────────────
 let currentStrukturColor = '00d4ff';
-let cachedStruktur = [];
 
-async function loadStruktur() {
-    cachedStruktur = await getApiData('struktur', DEFAULT_STRUKTUR);
-    const data = cachedStruktur;
+function loadStruktur() {
+    const data = getData('struktur_db', DEFAULT_STRUKTUR);
     const levelLabels = ['Wali Kelas', 'Ketua / Wakil', 'Staff'];
     const levelColors = ['from-cyber-blue/20 to-cyber-blue/5 border-cyber-blue/20', 'from-electric-purple/20 to-electric-purple/5 border-electric-purple/20', 'from-neon-green/20 to-neon-green/5 border-neon-green/20'];
     const grid = document.getElementById('struktur-grid');
@@ -437,7 +491,7 @@ function openStrukturModal(id = null) {
     currentStrukturColor = '00d4ff';
     setStrukturColor('00d4ff', document.querySelector('.str-color-pick[data-color="00d4ff"]'));
     if (id) {
-        const s = cachedStruktur.find(x => x.id === id);
+        const s = getData('struktur_db', DEFAULT_STRUKTUR).find(x => x.id === id);
         if (!s) return;
         document.getElementById('struktur-id').value = s.id;
         document.getElementById('struktur-name').value = s.name;
@@ -457,9 +511,9 @@ function setStrukturColor(color, el) {
     if (el) el.style.borderColor = '#fff';
 }
 
-document.getElementById('struktur-form').addEventListener('submit', async function(e) {
+document.getElementById('struktur-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    const btn = document.querySelector('#struktur-form button[type="submit"]');
+    const data_arr = getData('struktur_db', DEFAULT_STRUKTUR);
     const id = parseInt(document.getElementById('struktur-id').value);
     const data = {
         name: document.getElementById('struktur-name').value.trim(),
@@ -469,11 +523,9 @@ document.getElementById('struktur-form').addEventListener('submit', async functi
         photo: null
     };
     if (!data.name || !data.jabatan) return showToast('Nama dan jabatan wajib diisi!', 'error');
-    
-    btn.disabled = true;
     if (id) {
-        data.id = id;
-        await apiCall('struktur', 'PUT', data);
+        const idx = data_arr.findIndex(s => s.id === id);
+        if (idx > -1) data_arr[idx] = { ...data_arr[idx], ...data };
         showToast('Jabatan berhasil diperbarui!');
     } else {
         data.id = nextId(data_arr);
@@ -496,11 +548,9 @@ function deleteStruktur(id) {
 
 // ── PROJECTS ──────────────────────────────────────────────────
 let currentProjectImageData = null;
-let cachedProjects = [];
 
-async function loadProjects() {
-    cachedProjects = await getApiData('projects', DEFAULT_PROJECTS);
-    const data = cachedProjects;
+function loadProjects() {
+    const data = getData('projects_db', DEFAULT_PROJECTS);
     const grid = document.getElementById('projects-grid');
     grid.innerHTML = data.map(p => `
         <div class="glass rounded-2xl overflow-hidden group flex flex-col" style="border-color: #${p.color}30">
@@ -530,7 +580,7 @@ function openProjectModal(id = null) {
     currentProjectImageData = null;
     document.getElementById('project-img-preview-wrap').innerHTML = '<p class="text-2xl mb-1">🖼️</p><p class="text-xs text-gray-500">Klik untuk upload gambar</p>';
     if (id) {
-        const p = cachedProjects.find(x => x.id === id);
+        const p = getData('projects_db', DEFAULT_PROJECTS).find(x => x.id === id);
         if (!p) return;
         document.getElementById('project-id').value = p.id;
         document.getElementById('project-title').value = p.title;
@@ -557,9 +607,9 @@ function previewProjectImage(input) {
     reader.readAsDataURL(file);
 }
 
-document.getElementById('project-form').addEventListener('submit', async function(e) {
+document.getElementById('project-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    const btn = document.querySelector('#project-form button[type="submit"]');
+    const data_arr = getData('projects_db', DEFAULT_PROJECTS);
     const id = parseInt(document.getElementById('project-id').value);
     const tags = document.getElementById('project-tags').value.split(',').map(t => t.trim()).filter(Boolean);
     const colors = ['00d4ff','7b2ff7','00ff88','ff00aa','ffae00'];
@@ -568,29 +618,27 @@ document.getElementById('project-form').addEventListener('submit', async functio
         description: document.getElementById('project-desc').value.trim(),
         tags, link: document.getElementById('project-link').value.trim(),
         image: currentProjectImageData,
-        color: colors[cachedProjects.length % colors.length]
+        color: colors[data_arr.length % colors.length]
     };
     if (!data.title) return showToast('Judul projek wajib diisi!', 'error');
-    
-    btn.disabled = true;
     if (id) {
-        data.id = id;
-        await apiCall('projects', 'PUT', data);
+        const idx = data_arr.findIndex(p => p.id === id);
+        if (idx > -1) data_arr[idx] = { ...data_arr[idx], ...data };
         showToast('Projek berhasil diperbarui!');
     } else {
-        data.id = nextId(cachedProjects);
-        await apiCall('projects', 'POST', data);
+        data.id = nextId(data_arr);
+        data_arr.push(data);
         showToast('Projek berhasil ditambahkan!');
     }
-    btn.disabled = false;
+    saveData('projects_db', data_arr);
     closeModal('project-modal');
     loadProjects();
 });
 
 function deleteProject(id) {
-    const p = cachedProjects.find(x => x.id === id);
-    confirmDelete(`Hapus projek "${p?.title}"?`, async () => {
-        await apiCall(`projects?id=${id}`, 'DELETE');
+    const p = getData('projects_db', DEFAULT_PROJECTS).find(x => x.id === id);
+    confirmDelete(`Hapus projek "${p?.title}"?`, () => {
+        saveData('projects_db', getData('projects_db', DEFAULT_PROJECTS).filter(x => x.id !== id));
         loadProjects();
         showToast('Projek berhasil dihapus.');
     });
@@ -598,11 +646,9 @@ function deleteProject(id) {
 
 // ── GALLERY ───────────────────────────────────────────────────
 let currentGalleryImageData = null;
-let cachedGallery = [];
 
-async function loadGallery() {
-    cachedGallery = await getApiData('gallery', DEFAULT_GALLERY);
-    const data = cachedGallery;
+function loadGallery() {
+    const data = getData('gallery_db', DEFAULT_GALLERY);
     const catColors = { belajar: '00d4ff', keseruan: '00ff88', event: '7b2ff7', candid: 'ffae00' };
     const grid = document.getElementById('gallery-grid-admin');
     grid.innerHTML = data.map(g => `
@@ -627,7 +673,7 @@ function openGalleryModal(id = null) {
     currentGalleryImageData = null;
     document.getElementById('gallery-img-preview-wrap').innerHTML = '<p class="text-3xl mb-1">📷</p><p class="text-xs text-gray-500">Klik atau drag foto ke sini</p>';
     if (id) {
-        const g = cachedGallery.find(x => x.id === id);
+        const g = getData('gallery_db', DEFAULT_GALLERY).find(x => x.id === id);
         if (g) {
             document.getElementById('gallery-id').value = g.id;
             document.getElementById('gallery-title').value = g.title;
@@ -653,9 +699,9 @@ function previewGalleryImage(input) {
     reader.readAsDataURL(file);
 }
 
-document.getElementById('gallery-form').addEventListener('submit', async function(e) {
+document.getElementById('gallery-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    const btn = document.querySelector('#gallery-form button[type="submit"]');
+    const data_arr = getData('gallery_db', DEFAULT_GALLERY);
     const id = parseInt(document.getElementById('gallery-id').value);
     const cat = document.getElementById('gallery-category').value;
     const catColors = { belajar: '00d4ff', keseruan: '00ff88', event: '7b2ff7', candid: 'ffae00' };
@@ -667,37 +713,31 @@ document.getElementById('gallery-form').addEventListener('submit', async functio
         span: 'col-span-1'
     };
     if (!data.title) return showToast('Judul foto wajib diisi!', 'error');
-    
-    btn.disabled = true;
     if (id) {
-        data.id = id;
-        await apiCall('gallery', 'PUT', data);
+        const idx = data_arr.findIndex(g => g.id === id);
+        if (idx > -1) data_arr[idx] = { ...data_arr[idx], ...data };
         showToast('Foto berhasil diperbarui!');
     } else {
-        data.id = nextId(cachedGallery);
-        await apiCall('gallery', 'POST', data);
+        data.id = nextId(data_arr);
+        data_arr.push(data);
         showToast('Foto berhasil ditambahkan!');
     }
-    btn.disabled = false;
+    saveData('gallery_db', data_arr);
     closeModal('gallery-modal');
     loadGallery();
 });
 
 function deleteGallery(id) {
-    confirmDelete('Hapus foto ini dari gallery?', async () => {
-        await apiCall(`gallery?id=${id}`, 'DELETE');
+    confirmDelete('Hapus foto ini dari gallery?', () => {
+        saveData('gallery_db', getData('gallery_db', DEFAULT_GALLERY).filter(x => x.id !== id));
         loadGallery();
         showToast('Foto berhasil dihapus.');
     });
 }
 
 // ── GUESTBOOK ─────────────────────────────────────────────────
-let cachedGuestbook = [];
-
-async function loadGuestbook() {
-    const res = await apiCall('guestbook');
-    cachedGuestbook = (res && res.data) ? res.data : JSON.parse(localStorage.getItem('xrpl_guestbook') || '[]');
-    const messages = cachedGuestbook;
+function loadGuestbook() {
+    const messages = JSON.parse(localStorage.getItem('xrpl_guestbook') || '[]');
     const el = document.getElementById('guestbook-admin');
     if (messages.length === 0) {
         el.innerHTML = '<p class="text-gray-500 text-sm italic text-center py-12">Belum ada pesan di guestbook.</p>';
@@ -718,21 +758,19 @@ async function loadGuestbook() {
     `).join('');
 }
 
-async function deleteGuestbookMsg(idx) {
-    const messagesStr = [...cachedGuestbook].reverse(); // visual array is reversed
-    const msg = messagesStr[idx];
-    if(msg && msg.date && msg.name) {
-        await apiCall(`guestbook?date=${encodeURIComponent(msg.date)}&name=${encodeURIComponent(msg.name)}`, 'DELETE');
-    }
-    await loadGuestbook();
+function deleteGuestbookMsg(idx) {
+    const msgs = JSON.parse(localStorage.getItem('xrpl_guestbook') || '[]');
+    msgs.splice(idx, 1);
+    localStorage.setItem('xrpl_guestbook', JSON.stringify(msgs));
+    loadGuestbook();
     updateOverview();
     showToast('Pesan berhasil dihapus.');
 }
 
 function clearAllGuestbook() {
-    confirmDelete('Hapus SEMUA pesan guestbook? Tindakan ini tidak bisa dibatalkan!', async () => {
-        await apiCall('guestbook?all=true', 'DELETE');
-        await loadGuestbook();
+    confirmDelete('Hapus SEMUA pesan guestbook? Tindakan ini tidak bisa dibatalkan!', () => {
+        localStorage.removeItem('xrpl_guestbook');
+        loadGuestbook();
         updateOverview();
         showToast('Semua pesan berhasil dihapus.');
     });
@@ -810,30 +848,44 @@ let myCurrentPhotoData = null;
 
 function loadMyProfile() {
     if (window.CURRENT_ROLE !== 'student') return;
-    
-    // Fallback: Ambil dari localStorage karena GET /api/students belum difilter proper 1 per 1 untuk student
-    // Atau ambil dari list via GET /api/students
+
     fetch('api/students')
         .then(res => res.json())
         .then(data => {
-            if(data.success) {
-                const me = data.data.find(s => s.id == window.CURRENT_USER_ID);
+            if (data.success) {
+                // BUGFIX: Cari berdasarkan _id MongoDB (ObjectId string), bukan id numerik
+                const currentUserId = String(window.CURRENT_USER_ID);
+                const me = data.data.find(s =>
+                    (s._id && s._id.toString() === currentUserId) ||
+                    (s.id && String(s.id) === currentUserId) ||
+                    (s.username && localStorage.getItem('xrpl_admin_user') &&
+                        JSON.parse(localStorage.getItem('xrpl_admin_user')).username === s.username)
+                );
+
                 if (me) {
-                    if (me.photo) {
-                        document.getElementById('my-photo-preview').src = 'uploads/students/' + me.photo;
-                    } else {
-                        document.getElementById('my-photo-preview').src = `https://placehold.co/160x160/${me.color||'00d4ff'}/fff?text=${me.name[0]}`;
-                    }
+                    // BUGFIX: photo sudah berupa URL/base64 lengkap dari MongoDB, tidak perlu prefix 'uploads/students/'
+                    const photoSrc = me.photo
+                        ? me.photo  // sudah berupa data URL atau URL lengkap
+                        : `https://ui-avatars.com/api/?name=${encodeURIComponent(me.name || 'Murid')}&background=${me.color || '00d4ff'}&color=fff&size=160`;
+                    document.getElementById('my-photo-preview').src = photoSrc;
                     document.getElementById('my-motto').value = me.motto || '';
                     document.getElementById('my-dream').value = me.dream || '';
                     document.getElementById('my-quote').value = me.quote || '';
+
+                    // Simpan _id MongoDB ke variabel global untuk keperluan update
+                    window.CURRENT_MONGO_ID = me._id ? me._id.toString() : null;
+                } else {
+                    // Jika tidak ditemukan, tampilkan form kosong dengan avatar default
+                    const user = JSON.parse(localStorage.getItem('xrpl_admin_user') || '{}');
+                    document.getElementById('my-photo-preview').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.full_name || 'Murid')}&background=00d4ff&color=fff&size=160`;
                 }
             }
-        }).catch(err => {
-            // Fallback localStorage mock
+        })
+        .catch(() => {
+            // Fallback localStorage
             const me = getData('students_db', DEFAULT_STUDENTS).find(s => s.id == window.CURRENT_USER_ID);
-            if(me) {
-                document.getElementById('my-photo-preview').src = me.photo || `https://placehold.co/160x160/${me.color}/fff?text=${me.name[0]}`;
+            if (me) {
+                document.getElementById('my-photo-preview').src = me.photo || `https://placehold.co/160x160/${me.color || '00d4ff'}/fff?text=${(me.name || 'M')[0]}`;
                 document.getElementById('my-motto').value = me.motto || '';
                 document.getElementById('my-dream').value = me.dream || '';
                 document.getElementById('my-quote').value = me.quote || '';
@@ -877,28 +929,23 @@ function saveMyProfile(e) {
         quote: document.getElementById('my-quote').value
     };
 
-    fetch(`api/students?id=${window.CURRENT_USER_ID}`, {
+    // BUGFIX: Gunakan CURRENT_MONGO_ID (ObjectId) jika tersedia, fallback ke CURRENT_USER_ID
+    const targetId = window.CURRENT_MONGO_ID || window.CURRENT_USER_ID;
+
+    fetch(`api/students?id=${targetId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     })
     .then(res => res.json())
     .then(res => {
-        if(res.success) {
+        if (res.success) {
             showToast('Profil berhasil disimpan!');
-            
-            // Sync local storage for mock sync if local app.js still uses localStorage
-            let students = getData('students_db', DEFAULT_STUDENTS);
-            let idx = students.findIndex(s => s.id == window.CURRENT_USER_ID);
-            if(idx > -1) {
-                students[idx] = { ...students[idx], ...data };
-                saveData('students_db', students);
-            }
         } else {
             showToast(res.message || 'Gagal menyimpan', 'error');
         }
     })
-    .catch(err => showToast('Gagal koneksi!', 'error'));
+    .catch(() => showToast('Gagal koneksi!', 'error'));
 }
 
 // ── MY SNAPSHOTS (STUDENT) ────────────────────────────────────
@@ -963,13 +1010,22 @@ function previewSnapshotImage(input) {
 function saveMySnapshot(e) {
     e.preventDefault();
     const btn = document.getElementById('snapshot-save-btn');
+    const imageFile = document.getElementById('snapshot-input').files[0];
+    const caption = document.getElementById('snapshot-caption').value;
+
+    if (!imageFile) return showToast('Pilih foto terlebih dahulu!', 'error');
+
     btn.disabled = true;
     btn.textContent = 'Uploading...';
 
+    // BUGFIX: Sertakan student_id agar snapshot terkait dengan murid yang login
+    const studentId = window.CURRENT_MONGO_ID || window.CURRENT_USER_ID;
+
     const formData = new FormData();
-    formData.append('image', document.getElementById('snapshot-input').files[0]);
-    formData.append('caption', document.getElementById('snapshot-caption').value);
-    
+    formData.append('image', imageFile);
+    formData.append('caption', caption);
+    formData.append('student_id', studentId);
+
     fetch('api/snapshots', {
         method: 'POST',
         body: formData
@@ -978,15 +1034,15 @@ function saveMySnapshot(e) {
     .then(res => {
         btn.disabled = false;
         btn.textContent = '📤 Upload';
-        if(res.success) {
+        if (res.success) {
             showToast('Snapshot berhasil diunggah!');
             closeModal('snapshot-modal');
             loadMySnapshots();
         } else {
-            showToast(res.message || 'Gagal uplaod', 'error');
+            showToast(res.message || 'Gagal upload snapshot.', 'error');
         }
     })
-    .catch(err => {
+    .catch(() => {
         btn.disabled = false;
         btn.textContent = '📤 Upload';
         showToast('Gagal koneksi ke server!', 'error');
