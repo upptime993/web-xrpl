@@ -268,7 +268,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const msgInput = document.getElementById('gb-message');
             
             const btn = form.querySelector('button[type="submit"]');
+            if (!nameInput.value.trim() || !msgInput.value.trim()) return;
+            
             if (btn) btn.disabled = true;
+            if (window.showLoader) window.showLoader();
 
             fetch('api/guestbook', {
                 method: 'POST',
@@ -277,16 +280,28 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .then(r => r.json())
             .then(res => {
+                if (window.hideLoader) window.hideLoader();
                 if (btn) btn.disabled = false;
                 if (res.success) {
                     nameInput.value = '';
                     msgInput.value = '';
                     loadMessages();
+                    
+                    // Show a quick custom toast on success
+                    const toast = document.createElement('div');
+                    toast.className = 'fixed bottom-4 right-4 bg-neon-green/20 border border-neon-green text-neon-green px-4 py-2 rounded-lg text-sm z-50 animate-fade-in-up';
+                    toast.innerHTML = '✅ Pesan berhasil dikirim!';
+                    document.body.appendChild(toast);
+                    setTimeout(() => {
+                        toast.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+                        setTimeout(() => toast.remove(), 300);
+                    }, 3000);
                 } else {
                     alert(res.message || 'Gagal kirim pesan.');
                 }
             })
             .catch(() => {
+                if (window.hideLoader) window.hideLoader();
                 if (btn) btn.disabled = false;
                 alert('Gagal koneksi ke server.');
             });
@@ -528,17 +543,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.getElementById('modal-gallery').innerHTML = '<div class="col-span-3 text-center py-4"><span class="text-white text-sm animate-pulse">Memuat gallery...</span></div>';
 
-        fetch(`api/snapshots?student_id=${s.id}`)
+        fetch(`api/snapshots?student_id=${s._id}`)
             .then(res => res.json())
             .then(data => {
                 let miniGalleryHTML = '';
                 if (data.success && data.data.length > 0) {
                     window._currentSnaps = window._currentSnaps || {};
-                    window._currentSnaps[s.id] = data.data;
+                    window._currentSnaps[s._id] = data.data;
 
                     const studentSnaps = data.data.slice(0, 9);
                     studentSnaps.forEach(snap => {
-                        miniGalleryHTML += `<div class="aspect-square rounded-lg overflow-hidden bg-white/5 cursor-pointer group relative snap-thumb" data-snap-id="${snap.id}" data-student-id="${s.id}">
+                        miniGalleryHTML += `<div class="aspect-square rounded-lg overflow-hidden bg-white/5 cursor-pointer group relative snap-thumb" data-snap-id="${snap.id}" data-student-id="${s._id}">
                             <img src="${snap.image_url}" alt="${snap.caption || 'Snapshot'}" class="w-full h-full object-cover group-hover:scale-110 transition-all duration-300">
                             <div class="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
                                 <span class="text-white text-xs">\u2764\ufe0f ${snap.likesCount}</span>
@@ -554,7 +569,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 document.getElementById('modal-gallery').innerHTML = miniGalleryHTML;
                 document.querySelectorAll('.snap-thumb').forEach(el => {
-                    el.addEventListener('click', () => window.openSnapLightbox(parseInt(el.dataset.snapId), parseInt(el.dataset.studentId)));
+                    // Update: dataset returns string, lightbox uses string ID now
+                    el.addEventListener('click', () => window.openSnapLightbox(el.dataset.snapId, el.dataset.studentId));
                 });
             })
             .catch(() => {
@@ -985,96 +1001,71 @@ document.addEventListener('DOMContentLoaded', () => {
             return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=${color || '00d4ff'}&color=fff&size=150`;
         };
 
-        const makeCard = (person, sizeClass = 'w-12 h-12 md:w-16 md:h-16', textSize = 'text-xs md:text-sm', subText = 'text-[10px] md:text-xs') => {
+        const makeCard = (person, imgSize, titleSize, subSize) => {
             const photo = person.photo || avatarUrl(person.name, person.color);
             return `
-                <img src="${photo}" alt="${escHtml(person.jabatan)}" class="${sizeClass} rounded-full mx-auto mb-2 object-cover border-2" style="border-color:#${person.color || '00d4ff'}55" loading="lazy">
-                <h3 class="font-semibold text-white ${textSize} truncate w-full px-1">${escHtml(person.name)}</h3>
-                <p class="${subText} font-medium" style="color:#${person.color || '00d4ff'}">${escHtml(person.jabatan)}</p>
-            `;
+            <div class="relative flex flex-col items-center group w-[130px] md:w-[170px] p-3 md:p-4 glass rounded-2xl hover:-translate-y-2 hover:shadow-[0_0_20px_rgba(0,0,0,0.5)] transition-all duration-300 border-t-2" style="border-top-color:#${person.color || '00d4ff'}; box-shadow: 0 4px 20px -2px #${person.color || '00d4ff'}22;">
+                <div class="absolute inset-0 bg-gradient-to-b from-[#${person.color || '00d4ff'}]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl pointer-events-none"></div>
+                <img src="${photo}" alt="${escHtml(person.jabatan)}" class="${imgSize} rounded-full object-cover border-2 shadow-lg mb-3" style="border-color:#${person.color || '00d4ff'}" loading="lazy">
+                <h3 class="font-bold text-white ${titleSize} text-center leading-tight truncate w-full group-hover:text-[#${person.color || '00d4ff'}] transition-colors">${escHtml(person.name)}</h3>
+                <p class="${subSize} text-center font-medium mt-1 truncate w-full" style="color:#${person.color || '00d4ff'}">${escHtml(person.jabatan)}</p>
+            </div>`;
         };
 
-        let html = '';
+        const renderRow = (items, delay, imgSize, titleSize, subSize) => {
+            if (items.length === 0) return '';
+            const dropLine = `<div class="struktur-line-v w-[2px] h-8 md:h-12 my-2 z-0"></div>`;
+            return `
+            <div class="flex flex-col items-center w-full reveal ${delay}">
+                ${dropLine}
+                <div class="flex justify-center items-start gap-4 md:gap-6 flex-wrap relative z-10 w-full max-w-5xl px-2">
+                    ${items.map(p => makeCard(p, imgSize, titleSize, subSize)).join('')}
+                </div>
+            </div>`;
+        };
 
-        // ── Level 0: Wali Kelas ──
+        let html = '<div class="flex flex-col items-center w-full relative pb-10">';
+
+        // 1. Wali Kelas (Root)
         if (waliKelas.length > 0) {
-            const wk = waliKelas[0];
             html += `
-            <div class="flex flex-col items-center reveal w-full">
-                <div class="glass w-56 md:w-64 rounded-2xl p-5 text-center border-t border-t-cyber-blue relative z-10 hover:scale-105 transition-transform duration-300 hover:shadow-[0_0_20px_rgba(0,212,255,0.2)]">
-                    ${makeCard(wk, 'w-16 h-16 md:w-20 md:h-20', 'text-base md:text-lg', 'text-xs md:text-sm')}
-                </div>
-                <div class="struktur-line-v w-[2px] h-8 md:h-12"></div>
-            </div>`;
-        }
-
-        // ── Level 0.5: Guru Produktif (maks 5) ──
-        if (guruProduktif.length > 0) {
-            const gpCount = guruProduktif.length;
-            html += `
-            <div class="relative w-full max-w-4xl reveal delay-50">
-                <div class="struktur-line-h absolute top-0 left-[${gpCount <= 1 ? '50' : gpCount <= 2 ? '25' : '10'}%] right-[${gpCount <= 1 ? '50' : gpCount <= 2 ? '25' : '10'}%] h-[2px] z-0"></div>
-                <div class="flex justify-center gap-3 md:gap-6 relative z-10 w-full flex-wrap">
-                    ${guruProduktif.map(gp => `
-                    <div class="relative flex flex-col items-center w-[130px] md:w-40">
-                        <div class="struktur-line-v absolute -top-6 md:-top-8 w-[2px] h-6 md:h-8"></div>
-                        <div class="glass w-full rounded-2xl p-3 md:p-4 text-center hover:scale-105 transition-transform duration-300 hover:shadow-[0_0_15px_rgba(255,193,7,0.2)] border-t" style="border-top-color:#f59e0b55">
-                            ${makeCard(gp)}
-                        </div>
-                        <div class="struktur-line-v w-[2px] h-4 md:h-6"></div>
-                    </div>`).join('')}
+            <div class="flex flex-col items-center w-full reveal">
+                <div class="flex justify-center w-full relative z-10">
+                    ${makeCard(waliKelas[0], 'w-20 h-20 md:w-24 md:h-24', 'text-lg md:text-xl', 'text-sm')}
                 </div>
             </div>`;
         }
 
-        // ── Level 1: Ketua / Wakil ──
-        if (ketuaWakil.length > 0) {
-            html += `
-            <div class="relative w-full max-w-2xl reveal delay-100">
-                <div class="struktur-line-h absolute top-0 left-[20%] right-[20%] md:left-1/4 md:right-1/4 h-[2px] z-0"></div>
-                <div class="flex justify-center gap-4 md:gap-32 relative z-10 w-full">
-                    ${ketuaWakil.map(kw => `
-                    <div class="relative flex flex-col items-center w-1/2 max-w-[180px] md:w-48">
-                        <div class="struktur-line-v absolute -top-8 md:-top-12 w-[2px] h-8 md:h-12"></div>
-                        <div class="glass w-full rounded-2xl p-3 md:p-4 text-center hover:scale-105 transition-transform duration-300 hover:shadow-[0_0_15px_rgba(123,47,247,0.2)]">
-                            ${makeCard(kw)}
-                        </div>
-                        <div class="struktur-line-v w-[2px] h-6 md:h-8"></div>
-                    </div>`).join('')}
-                </div>
-            </div>`;
-        }
-
-        // ── Level 2: Staff (Sekretaris / Bendahara) ──
-        if (staff.length > 0) {
-            html += `
-            <div class="relative w-full max-w-3xl reveal delay-200">
-                <div class="struktur-line-h absolute top-0 left-[10%] right-[10%] h-[2px] z-0"></div>
-                <div class="grid grid-cols-2 md:grid-cols-${Math.min(staff.length, 4)} gap-3 md:gap-4 relative z-10 w-full px-2 mt-0">
-                    ${staff.map(st => `
-                    <div class="relative flex flex-col items-center">
-                        <div class="struktur-line-v absolute -top-6 md:-top-8 w-[2px] h-6 md:h-8"></div>
-                        <div class="glass w-full max-w-[150px] rounded-2xl p-3 text-center hover:scale-105 transition-transform">
-                            ${makeCard(st, 'w-10 h-10 md:w-14 md:h-14', 'text-[11px] md:text-xs', 'text-[9px] md:text-[10px]')}
-                        </div>
-                    </div>`).join('')}
-                </div>
-            </div>`;
-        }
-
-        // ── Level 3: Anggota ──
+        // 2. Guru Produktif
+        html += renderRow(guruProduktif, 'delay-50', 'w-16 h-16 md:w-20 md:h-20', 'text-base md:text-lg', 'text-xs md:text-sm');
+        
+        // 3. Ketua / Wakil
+        html += renderRow(ketuaWakil, 'delay-100', 'w-14 h-14 md:w-16 md:h-16', 'text-sm md:text-base', 'text-[10px] md:text-xs');
+        
+        // 4. Staff (Sekretaris / Bendahara)
+        html += renderRow(staff, 'delay-200', 'w-12 h-12 md:w-14 md:h-14', 'text-xs md:text-sm', 'text-[9px] md:text-[10px]');
+        
+        // 5. Anggota
         if (anggota.length > 0) {
             html += `
-            <div class="relative w-full max-w-4xl reveal delay-300 mt-6">
-                <div class="struktur-line-h w-full h-[2px] mb-4"></div>
-                <div class="grid grid-cols-3 md:grid-cols-${Math.min(anggota.length, 5)} gap-3 md:gap-4 relative z-10 w-full px-2">
-                    ${anggota.map(ag => `
-                    <div class="glass w-full rounded-xl p-2 md:p-3 text-center hover:scale-105 transition-transform">
-                        ${makeCard(ag, 'w-8 h-8 md:w-12 md:h-12', 'text-[10px] md:text-xs', 'text-[8px] md:text-[10px]')}
-                    </div>`).join('')}
+            <div class="flex flex-col items-center w-full reveal delay-300">
+                <div class="struktur-line-v w-[2px] h-8 md:h-12 my-2 z-0"></div>
+                <!-- Anggota Grid Pinned -->
+                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4 w-full px-2 max-w-6xl mt-0 relative z-10">
+                    ${anggota.map(a => `
+                    <div class="glass p-2 md:p-3 rounded-xl flex items-center gap-2 md:gap-3 hover:-translate-y-1 transition-transform border-l-2" style="border-left-color:#${a.color || '00d4ff'}">
+                        <img src="${a.photo || avatarUrl(a.name, a.color)}" alt="${escHtml(a.jabatan)}" class="w-8 h-8 md:w-10 md:h-10 rounded-full border object-cover" style="border-color:#${a.color || '00d4ff'}" loading="lazy">
+                        <div class="min-w-0 flex-1">
+                            <h4 class="text-[10px] md:text-xs font-bold text-white truncate max-w-[80px] md:max-w-full">${escHtml(a.name)}</h4>
+                            <p class="text-[9px] truncate max-w-[80px] md:max-w-full" style="color:#${a.color || '00d4ff'}">${escHtml(a.jabatan)}</p>
+                        </div>
+                    </div>
+                    `).join('')}
                 </div>
             </div>`;
         }
+
+        html += '</div>';
 
         container.innerHTML = html;
         initScrollAnimations();

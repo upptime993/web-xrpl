@@ -550,8 +550,43 @@ function openStrukturModal(id = null) {
         document.getElementById('struktur-jabatan').value = s.jabatan;
         document.getElementById('struktur-level').value = s.level;
         setStrukturColor(s.color, document.querySelector(`.str-color-pick[data-color="${s.color}"]`));
+        
+        if (s.photo) {
+            document.getElementById('struktur-photo-preview').src = s.photo;
+            document.getElementById('struktur-photo-preview').classList.remove('hidden');
+            document.getElementById('struktur-photo-base64').value = s.photo;
+            document.getElementById('struktur-photo-clear').classList.remove('hidden');
+        } else {
+            clearStrukturPhoto();
+        }
+    } else {
+        clearStrukturPhoto();
     }
     openModal('struktur-modal');
+}
+
+function previewStrukturPhoto(input) {
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        if (file.size > 2 * 1024 * 1024) return showToast('File terlalu besar (maks 2MB)', 'error');
+        const reader = new FileReader();
+        reader.onload = e => {
+            const b64 = e.target.result;
+            document.getElementById('struktur-photo-preview').src = b64;
+            document.getElementById('struktur-photo-preview').classList.remove('hidden');
+            document.getElementById('struktur-photo-base64').value = b64;
+            document.getElementById('struktur-photo-clear').classList.remove('hidden');
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+function clearStrukturPhoto() {
+    document.getElementById('struktur-photo').value = '';
+    document.getElementById('struktur-photo-preview').src = '';
+    document.getElementById('struktur-photo-preview').classList.add('hidden');
+    document.getElementById('struktur-photo-base64').value = '';
+    document.getElementById('struktur-photo-clear').classList.add('hidden');
 }
 
 function editStruktur(id) { openStrukturModal(id); }
@@ -570,7 +605,7 @@ document.getElementById('struktur-form').addEventListener('submit', function(e) 
         jabatan: document.getElementById('struktur-jabatan').value.trim(),
         level: parseFloat(document.getElementById('struktur-level').value),
         color: currentStrukturColor,
-        photo: null
+        photo: document.getElementById('struktur-photo-base64').value || null
     };
     if (!data.name || !data.jabatan) return showToast('Nama dan jabatan wajib diisi!', 'error');
 
