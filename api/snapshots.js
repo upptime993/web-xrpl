@@ -1,6 +1,8 @@
 import getDB from './_db.js';
 import { ObjectId } from 'mongodb';
-import { verifyAuth } from './_auth.js';
+import { sendSuccess, sendError, parseBody, isValidObjectId, getPagination } from './_helpers.js';
+import { requireAuth } from './_auth.js';
+import { rateLimit } from './_rateLimit.js';
 import { uploadToCloudinary } from './_cloudinary.js';
 
 // Matikan body parser bawaan agar bisa baca FormData
@@ -10,19 +12,18 @@ export default async function handler(req, res) {
     const db = await getDB();
     const collection = db.collection('snapshots');
 
-    // --- GET: Ambil snapshot (semua atau per student, dengan pagination) ---
+    // --- GET: Ambil snapshot (public, per student atau semua) ---
     if (req.method === 'GET') {
         try {
             const { student_id } = req.query;
-            const page = parseInt(req.query.page) || 1;
-            const limit = parseInt(req.query.limit) || 20; // 20 per halaman
-            const skip = (page - 1) * limit;
+            const pagination = getPagination(req.query);
+            const query = student_id ? { student_id } : {};
 
-            const query = student_id ? { student_id: student_id } : {};
-            const snapshots = await collection.find(query).sort({ created_at: -1 }).skip(skip).limit(limit).toArray();
-            const total = await collection.countDocuments(query);
+            const [snapshots, total] = await Promise.all([
+                collection.find(query).sort({ created_at: -1 }).skip(pagination.skip).limit(pagination.limit).toArray(),
+                collection.countDocuments(query)
+            ]);
 
-            // Format data agar konsisten
             const formatted = snapshots.map(s => ({
                 ...s,
                 id: s._id.toString(),
@@ -30,66 +31,78 @@ export default async function handler(req, res) {
                 comments: s.comments || []
             }));
 
-            return res.status(200).json({ 
-                success: true, 
+            return sendSuccess(res, {
                 data: formatted,
-                pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+                pagination: {
+                    page: pagination.page,
+                    limit: pagination.limit,
+                    total,
+                    totalPages: Math.ceil(total / pagination.limit)
+                }
             });
         } catch (error) {
-            console.error("GET /api/snapshots error:", error);
-            return res.status(500).json({ success: false, error: 'Server Error: ' + error.message });
+            console.error('Snapshots GET error:', error);
+            return sendError(res, 'Server Error: ' + error.message);
         }
     }
 
-    // --- POST: Upload snapshot baru ATAU aksi like/comment ---
+    // --- POST: Upload snapshot / like / comment ---
     if (req.method === 'POST') {
         const { action } = req.query;
 
-        // Handle like/unlike (Public)
+        // Handle like
         if (action === 'like') {
+            const allowed = await rateLimit(req, res, 'snapshot-like', 30, 60000);
+            if (!allowed) return;
+
             try {
                 let body = req.body;
                 if (typeof body === 'string') body = JSON.parse(body);
-                const { snapshot_id } = body;
+                const { snapshot_id } = body || {};
 
-                // Gunakan IP
-                const userIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || req.connection?.remoteAddress || 'unknown';
+                if (!snapshot_id || !isValidObjectId(snapshot_id)) {
+                    return sendError(res, 'snapshot_id tidak valid', 400);
+                }
 
+                const userIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown';
                 const snap = await collection.findOne({ _id: new ObjectId(snapshot_id) });
-                if (!snap) return res.status(404).json({ success: false, error: 'Snapshot tidak ditemukan' });
+                if (!snap) return sendError(res, 'Snapshot tidak ditemukan', 404);
 
                 const likes = snap.likes || [];
                 const alreadyLiked = likes.includes(userIp);
 
                 if (alreadyLiked) {
                     await collection.updateOne({ _id: new ObjectId(snapshot_id) }, { $pull: { likes: userIp } });
-                    return res.status(200).json({ success: true, action: 'unliked', likesCount: likes.length - 1 });
+                    return sendSuccess(res, { action: 'unliked', likesCount: likes.length - 1 });
                 } else {
                     await collection.updateOne({ _id: new ObjectId(snapshot_id) }, { $push: { likes: userIp } });
-                    return res.status(200).json({ success: true, action: 'liked', likesCount: likes.length + 1 });
+                    return sendSuccess(res, { action: 'liked', likesCount: likes.length + 1 });
                 }
             } catch (error) {
-                console.error("LIKE error:", error);
-                return res.status(500).json({ success: false, error: 'Server Error: ' + error.message });
+                console.error('Snapshot like error:', error);
+                return sendError(res, 'Server Error: ' + error.message);
             }
         }
 
-        // Handle komentar (Public with basic spam protection)
+        // Handle comment
         if (action === 'comment') {
+            const allowed = await rateLimit(req, res, 'snapshot-comment', 10, 60000);
+            if (!allowed) return;
+
             try {
                 let body = req.body;
                 if (typeof body === 'string') body = JSON.parse(body);
-                const { snapshot_id, name, text } = body;
+                const { snapshot_id, name, text } = body || {};
 
-                if (!name || !text) return res.status(400).json({ success: false, error: 'Nama dan komentar wajib diisi' });
-                if (text.length > 200) return res.status(400).json({ success: false, error: 'Komentar terlalu panjang (maks 200 karakter)' });
-
-                const cleanName = name.replace(/</g, "&lt;").replace(/>/g, "&gt;").substring(0, 50);
-                const cleanText = text.replace(/</g, "&lt;").replace(/>/g, "&gt;").substring(0, 200);
+                if (!snapshot_id || !isValidObjectId(snapshot_id)) {
+                    return sendError(res, 'snapshot_id tidak valid', 400);
+                }
+                if (!name || !text) return sendError(res, 'Nama dan komentar wajib diisi', 400);
+                if (text.length > 200) return sendError(res, 'Komentar terlalu panjang (maks 200 karakter)', 400);
 
                 const newComment = {
-                    name: cleanName,
-                    text: cleanText,
+                    name: name.substring(0, 50),
+                    text: text.substring(0, 200),
                     date: new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
                 };
 
@@ -98,16 +111,15 @@ export default async function handler(req, res) {
                     { $push: { comments: newComment } }
                 );
 
-                return res.status(200).json({ success: true, message: 'Komentar berhasil ditambahkan', data: newComment });
+                return sendSuccess(res, { message: 'Komentar berhasil ditambahkan', comment: newComment });
             } catch (error) {
-                console.error("COMMENT error:", error);
-                return res.status(500).json({ success: false, error: 'Server Error: ' + error.message });
+                console.error('Snapshot comment error:', error);
+                return sendError(res, 'Server Error: ' + error.message);
             }
         }
 
-        // Handle upload snapshot baru (FormData dengan foto)
-        // Handle upload snapshot baru (Auth admin & student)
-        const user = verifyAuth(req, res, ['admin', 'student']);
+        // Handle upload snapshot baru (requires auth)
+        const user = requireAuth(req, res);
         if (!user) return;
 
         try {
@@ -117,12 +129,16 @@ export default async function handler(req, res) {
                 chunks.push(chunk);
             }
             const buffer = Buffer.concat(chunks);
-            const contentType = req.headers['content-type'] || '';
 
-            // Ambil boundary dari content-type
+            // Check size limit (5MB)
+            if (buffer.length > 5 * 1024 * 1024) {
+                return sendError(res, 'File terlalu besar. Maksimal 5MB.', 400);
+            }
+
+            const contentType = req.headers['content-type'] || '';
             const boundaryMatch = contentType.match(/boundary=(.+)$/);
             if (!boundaryMatch) {
-                return res.status(400).json({ success: false, error: 'Request bukan multipart/form-data' });
+                return sendError(res, 'Request bukan multipart/form-data', 400);
             }
 
             const boundary = boundaryMatch[1];
@@ -131,7 +147,6 @@ export default async function handler(req, res) {
             let studentId = null;
             let caption = '';
             let imageBase64 = null;
-            let imageMimeType = 'image/jpeg';
 
             for (const part of parts) {
                 const dispositionMatch = part.headers['content-disposition'] || '';
@@ -143,81 +158,88 @@ export default async function handler(req, res) {
                 } else if (partName === 'student_id') {
                     studentId = part.body.toString('utf-8').trim();
                 } else if (partName === 'image') {
-                    imageMimeType = part.headers['content-type'] || 'image/jpeg';
-                    const base64Str = part.body.toString('base64');
-                    if (base64Str.length > 5 * 1024 * 1024 * 1.33) {
-                       return res.status(400).json({ success: false, error: 'Foto melebihi batas 5MB' });
-                    }
-                    imageBase64 = `data:${imageMimeType};base64,${base64Str}`;
+                    const imageMimeType = part.headers['content-type'] || 'image/jpeg';
+                    imageBase64 = `data:${imageMimeType};base64,${part.body.toString('base64')}`;
                 }
             }
 
-            if (!imageBase64) return res.status(400).json({ success: false, error: 'File gambar tidak ditemukan' });
-            if (!studentId) return res.status(400).json({ success: false, error: 'student_id diperlukan' });
+            if (!imageBase64) {
+                return sendError(res, 'File gambar tidak ditemukan', 400);
+            }
+            if (!studentId) {
+                return sendError(res, 'student_id diperlukan', 400);
+            }
 
             // Upload ke Cloudinary
-            const uploadResult = await uploadToCloudinary(imageBase64, 'xrpl_snapshots');
+            const uploadResult = await uploadToCloudinary(imageBase64, 'xrpl/snapshots');
+            if (!uploadResult.success) {
+                return sendError(res, uploadResult.message || 'Gagal upload gambar', 500);
+            }
 
             const newSnapshot = {
                 student_id: studentId,
-                caption: caption.replace(/</g, "&lt;").replace(/>/g, "&gt;") || 'Snapshot',
-                image_url: uploadResult.secure_url,
+                caption: caption || 'Snapshot',
+                image_url: uploadResult.url,
                 likes: [],
                 comments: [],
                 created_at: new Date()
             };
 
             const result = await collection.insertOne(newSnapshot);
-            return res.status(201).json({
-                success: true,
+            return sendSuccess(res, {
                 message: 'Snapshot berhasil diunggah',
-                data: { id: result.insertedId.toString(), ...newSnapshot }
-            });
+                id: result.insertedId.toString()
+            }, 201);
         } catch (error) {
-            console.error("UPLOAD SNAPSHOT error:", error);
-            return res.status(500).json({ success: false, error: 'Server Error: ' + error.message });
+            console.error('Snapshot upload error:', error);
+            return sendError(res, 'Server Error: ' + error.message);
         }
     }
 
-    // --- DELETE: Hapus snapshot (Admin & Student) ---
+    // --- DELETE: Hapus snapshot (auth required, ownership check) ---
     if (req.method === 'DELETE') {
-        const user = verifyAuth(req, res, ['admin', 'student']);
+        const user = requireAuth(req, res);
         if (!user) return;
 
         const { id } = req.query;
-        if (!id) return res.status(400).json({ success: false, error: 'ID snapshot diperlukan' });
+        if (!id) return sendError(res, 'ID snapshot diperlukan', 400);
+        if (!isValidObjectId(id)) return sendError(res, 'ID tidak valid', 400);
 
         try {
+            // Check ownership (student can only delete their own)
+            if (user.role === 'student') {
+                const snap = await collection.findOne({ _id: new ObjectId(id) });
+                if (!snap) return sendError(res, 'Snapshot tidak ditemukan', 404);
+                if (snap.student_id !== user.id) {
+                    return sendError(res, 'Forbidden: Kamu hanya bisa menghapus snapshot sendiri', 403);
+                }
+            }
+
             await collection.deleteOne({ _id: new ObjectId(id) });
-            return res.status(200).json({ success: true, message: 'Snapshot berhasil dihapus' });
+            return sendSuccess(res, { message: 'Snapshot berhasil dihapus' });
         } catch (error) {
-            console.error("DELETE SNAPSHOT error:", error);
-            return res.status(500).json({ success: false, error: 'Server Error: ' + error.message });
+            console.error('Snapshot DELETE error:', error);
+            return sendError(res, 'Server Error: ' + error.message);
         }
     }
 
-    res.status(405).json({ success: false, error: 'Method Not Allowed' });
+    return sendError(res, 'Method Not Allowed', 405);
 }
 
 // Helper: parse manual multipart/form-data
 function parseMultipart(buffer, boundary) {
     const parts = [];
     const boundaryBuf = Buffer.from('--' + boundary);
-    const endBoundaryBuf = Buffer.from('--' + boundary + '--');
 
     let start = 0;
     while (start < buffer.length) {
         const boundaryIdx = buffer.indexOf(boundaryBuf, start);
         if (boundaryIdx === -1) break;
 
-        // Cek apakah ini boundary akhir
         const afterBoundary = boundaryIdx + boundaryBuf.length;
         if (buffer.slice(afterBoundary, afterBoundary + 2).toString() === '--') break;
 
-        // Skip \r\n setelah boundary
         const headerStart = afterBoundary + 2;
-
-        // Cari akhir headers (dua \r\n berturut-turut)
         const headerEndIdx = buffer.indexOf(Buffer.from('\r\n\r\n'), headerStart);
         if (headerEndIdx === -1) break;
 
@@ -232,8 +254,6 @@ function parseMultipart(buffer, boundary) {
         });
 
         const bodyStart = headerEndIdx + 4;
-
-        // Cari boundary berikutnya
         const nextBoundaryIdx = buffer.indexOf(boundaryBuf, bodyStart);
         const bodyEnd = nextBoundaryIdx === -1 ? buffer.length : nextBoundaryIdx - 2;
 

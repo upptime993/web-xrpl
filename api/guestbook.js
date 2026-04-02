@@ -1,102 +1,119 @@
 import getDB from './_db.js';
-import { verifyAuth } from './_auth.js';
 import { ObjectId } from 'mongodb';
+import { sendSuccess, sendError, parseBody, isValidObjectId, getPagination } from './_helpers.js';
+import { requireAdmin } from './_auth.js';
+import { rateLimit } from './_rateLimit.js';
 
-// API untuk Guestbook/Pesan Singkat — MONGODB based
 export default async function handler(req, res) {
     const db = await getDB();
     const collection = db.collection('guestbook');
 
-    // --- GET (Public): Ambil semua pesan ---
+    // --- GET: Ambil semua pesan (public, dengan pagination) ---
     if (req.method === 'GET') {
         try {
-            const page = parseInt(req.query.page) || 1;
-            const limit = parseInt(req.query.limit) || 50;
-            const skip = (page - 1) * limit;
-
-            const messages = await collection.find({}).sort({ created_at: -1 }).skip(skip).limit(limit).toArray();
-            const total = await collection.countDocuments({});
+            const pagination = getPagination(req.query);
+            const [messages, total] = await Promise.all([
+                collection.find({}).sort({ created_at: -1 }).skip(pagination.skip).limit(pagination.limit).toArray(),
+                collection.countDocuments({})
+            ]);
 
             const formatted = messages.map(m => ({
                 ...m,
                 id: m._id.toString(),
                 date: m.created_at
-                    ? new Date(m.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                    ? new Date(m.created_at).toLocaleDateString('id-ID', {
+                        day: '2-digit', month: 'short', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit'
+                    })
                     : '-'
             }));
 
-            return res.status(200).json({ 
-                success: true, 
+            return sendSuccess(res, {
                 data: formatted,
-                pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+                pagination: {
+                    page: pagination.page,
+                    limit: pagination.limit,
+                    total,
+                    totalPages: Math.ceil(total / pagination.limit)
+                }
             });
         } catch (error) {
-            console.error("GET /api/guestbook error:", error);
-            return res.status(500).json({ success: false, error: 'Server Error: ' + error.message });
+            console.error('Guestbook GET error:', error);
+            return sendError(res, 'Server Error: ' + error.message);
         }
     }
 
-    // --- POST (Public): Kirim pesan baru ---
+    // --- POST: Kirim pesan baru (public, rate limited) ---
     if (req.method === 'POST') {
+        // Rate limit: max 5 messages per minute
+        const allowed = await rateLimit(req, res, 'guestbook-post', 5, 60000);
+        if (!allowed) return;
+
         try {
-            let body = req.body;
-            if (typeof body === 'string') body = JSON.parse(body);
-
+            const body = parseBody(req);
             const { name, text } = body;
-            if (!name || !text) return res.status(400).json({ success: false, error: 'Nama dan pesan wajib diisi' });
-            if (text.length > 500) return res.status(400).json({ success: false, error: 'Pesan terlalu panjang (maks 500 karakter)' });
 
-            const userIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || req.connection?.remoteAddress || 'unknown';
-
-            // Cek jumlah pesan dari IP ini
-            const ipCount = await collection.countDocuments({ ip: userIp });
-            if (ipCount >= 2) {
-                return res.status(429).json({ success: false, error: 'Batas maksimal 2 pesan per perangkat telah tercapai. Terimakasih partisipasinya!' });
+            if (!name || !name.trim()) {
+                return sendError(res, 'Nama wajib diisi', 400);
+            }
+            if (!text || !text.trim()) {
+                return sendError(res, 'Pesan wajib diisi', 400);
+            }
+            if (text.length > 500) {
+                return sendError(res, 'Pesan terlalu panjang (maks 500 karakter)', 400);
+            }
+            if (name.length > 80) {
+                return sendError(res, 'Nama terlalu panjang (maks 80 karakter)', 400);
             }
 
-            // Sanitasi input dasar (cegah XSS injection sederhana)
-            const cleanName = name.replace(/</g, "&lt;").replace(/>/g, "&gt;").substring(0, 80).trim();
-            const cleanText = text.replace(/</g, "&lt;").replace(/>/g, "&gt;").substring(0, 500).trim();
+            const userIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+                req.socket?.remoteAddress || 'unknown';
+
+            // Cek jumlah pesan dari IP ini (maks 5 per device)
+            const ipCount = await collection.countDocuments({ ip: userIp });
+            if (ipCount >= 5) {
+                return sendError(res, 'Batas maksimal 5 pesan per perangkat telah tercapai. Terima kasih partisipasinya!', 429);
+            }
 
             const newMsg = {
-                name: cleanName,
-                text: cleanText,
+                name: name.substring(0, 80).trim(),
+                text: text.substring(0, 500).trim(),
                 ip: userIp,
                 created_at: new Date()
             };
 
             const result = await collection.insertOne(newMsg);
-            return res.status(201).json({
-                success: true,
+            return sendSuccess(res, {
                 message: 'Pesan berhasil dikirim!',
-                data: { id: result.insertedId.toString(), ...newMsg }
-            });
+                id: result.insertedId.toString()
+            }, 201);
         } catch (error) {
-            console.error("POST /api/guestbook error:", error);
-            return res.status(500).json({ success: false, error: 'Server Error: ' + error.message });
+            console.error('Guestbook POST error:', error);
+            return sendError(res, 'Server Error: ' + error.message);
         }
     }
 
-    // --- DELETE (Admin Only): Hapus pesan ---
+    // --- DELETE: Hapus pesan (Admin Only) ---
     if (req.method === 'DELETE') {
-        const user = verifyAuth(req, res, ['admin']);
-        if (!user) return;
+        const admin = requireAdmin(req, res);
+        if (!admin) return;
 
         const { id, all } = req.query;
         try {
             if (all === 'true') {
                 await collection.deleteMany({});
-                return res.status(200).json({ success: true, message: 'Semua pesan berhasil dihapus' });
+                return sendSuccess(res, { message: 'Semua pesan berhasil dihapus' });
             }
-            if (!id) return res.status(400).json({ success: false, error: 'ID pesan diperlukan' });
-            
+            if (!id) return sendError(res, 'ID pesan diperlukan', 400);
+            if (!isValidObjectId(id)) return sendError(res, 'ID tidak valid', 400);
+
             await collection.deleteOne({ _id: new ObjectId(id) });
-            return res.status(200).json({ success: true, message: 'Pesan berhasil dihapus' });
+            return sendSuccess(res, { message: 'Pesan berhasil dihapus' });
         } catch (error) {
-            console.error("DELETE /api/guestbook error:", error);
-            return res.status(500).json({ success: false, error: 'Server Error: ' + error.message });
+            console.error('Guestbook DELETE error:', error);
+            return sendError(res, 'Server Error: ' + error.message);
         }
     }
 
-    return res.status(405).json({ success: false, error: 'Method Not Allowed' });
+    return sendError(res, 'Method Not Allowed', 405);
 }

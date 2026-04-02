@@ -1,22 +1,21 @@
 import getDB from './_db.js';
 import { ObjectId } from 'mongodb';
-import { verifyAuth } from './_auth.js';
+import { sendSuccess, sendError, parseBody, isValidObjectId, getPagination } from './_helpers.js';
+import { requireAdmin } from './_auth.js';
 import { uploadToCloudinary } from './_cloudinary.js';
 
-// API untuk Projects — MONGODB based
 export default async function handler(req, res) {
     const db = await getDB();
     const collection = db.collection('projects');
 
-    // --- GET (Public) ---
+    // --- GET: Ambil semua projek (public, dengan pagination) ---
     if (req.method === 'GET') {
         try {
-            const page = parseInt(req.query.page) || 1;
-            const limit = parseInt(req.query.limit) || 20;
-            const skip = (page - 1) * limit;
-
-            const items = await collection.find({}).sort({ created_at: -1 }).skip(skip).limit(limit).toArray();
-            const total = await collection.countDocuments({});
+            const pagination = getPagination(req.query);
+            const [items, total] = await Promise.all([
+                collection.find({}).sort({ created_at: -1 }).skip(pagination.skip).limit(pagination.limit).toArray(),
+                collection.countDocuments({})
+            ]);
 
             const formatted = items.map(p => ({
                 ...p,
@@ -25,42 +24,46 @@ export default async function handler(req, res) {
                 color: p.color || '00d4ff'
             }));
 
-            return res.status(200).json({ 
-                success: true, 
+            return sendSuccess(res, {
                 data: formatted,
-                pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+                pagination: {
+                    page: pagination.page,
+                    limit: pagination.limit,
+                    total,
+                    totalPages: Math.ceil(total / pagination.limit)
+                }
             });
         } catch (error) {
-            console.error("GET /api/projects error:", error);
-            return res.status(500).json({ success: false, error: 'Server Error: ' + error.message });
+            console.error('Projects GET error:', error);
+            return sendError(res, 'Server Error: ' + error.message);
         }
     }
 
-    // --- POST: Tambah projek baru (Admin ONLY) ---
+    // --- POST: Tambah projek baru (Admin Only) ---
     if (req.method === 'POST') {
-        const user = verifyAuth(req, res, ['admin']);
-        if (!user) return;
+        const admin = requireAdmin(req, res);
+        if (!admin) return;
 
         try {
-            let body = req.body;
-            if (typeof body === 'string') body = JSON.parse(body);
-
+            const body = parseBody(req);
             const { title, description, tags, link, image, color } = body;
-            if (!title) return res.status(400).json({ success: false, error: 'Judul projek wajib diisi' });
+            if (!title || !title.trim()) {
+                return sendError(res, 'Judul projek wajib diisi', 400);
+            }
 
+            // Upload gambar ke Cloudinary
             let imageUrl = null;
             if (image && image.startsWith('data:image')) {
-                if (image.length > 5 * 1024 * 1024 * 1.33) return res.status(400).json({ success: false, error: 'Foto melebihi batas 5MB' });
-                const uploadResult = await uploadToCloudinary(image, 'xrpl_projects');
-                imageUrl = uploadResult.secure_url;
-            } else if (image && image.startsWith('http')) {
+                const uploadResult = await uploadToCloudinary(image, 'xrpl/projects');
+                if (uploadResult.success) imageUrl = uploadResult.url;
+            } else if (image) {
                 imageUrl = image;
             }
 
             const newItem = {
-                title: title.trim().replace(/</g, "&lt;"),
-                description: (description || '').trim().replace(/</g, "&lt;"),
-                tags: Array.isArray(tags) ? tags : (tags || '').split(',').map(t => t.trim().replace(/</g, "&lt;")).filter(Boolean),
+                title: title.trim(),
+                description: (description || '').trim(),
+                tags: Array.isArray(tags) ? tags : (tags || '').split(',').map(t => t.trim()).filter(Boolean),
                 link: (link || '').trim(),
                 image: imageUrl,
                 color: color || '00d4ff',
@@ -68,66 +71,69 @@ export default async function handler(req, res) {
             };
 
             const result = await collection.insertOne(newItem);
-            return res.status(201).json({ success: true, message: 'Projek berhasil ditambahkan', data: { id: result.insertedId.toString(), ...newItem } });
+            return sendSuccess(res, {
+                message: 'Projek berhasil ditambahkan',
+                id: result.insertedId.toString()
+            }, 201);
         } catch (error) {
-            console.error("POST /api/projects error:", error);
-            return res.status(500).json({ success: false, error: 'Server Error: ' + error.message });
+            console.error('Projects POST error:', error);
+            return sendError(res, 'Server Error: ' + error.message);
         }
     }
 
-    // --- PUT: Update projek (Admin) ---
+    // --- PUT: Update projek (Admin Only) ---
     if (req.method === 'PUT') {
-        const user = verifyAuth(req, res, ['admin']);
-        if (!user) return;
+        const admin = requireAdmin(req, res);
+        if (!admin) return;
 
         try {
-            let body = req.body;
-            if (typeof body === 'string') body = JSON.parse(body);
-
+            const body = parseBody(req);
             const id = req.query.id || body.id;
-            if (!id) return res.status(400).json({ success: false, error: 'ID diperlukan' });
+            if (!id) return sendError(res, 'ID diperlukan', 400);
+            if (!isValidObjectId(id)) return sendError(res, 'ID tidak valid', 400);
 
             const { title, description, tags, link, image, color } = body;
             const updateFields = { updated_at: new Date() };
-
-            if (title !== undefined) updateFields.title = title.trim().replace(/</g, "&lt;");
-            if (description !== undefined) updateFields.description = description.trim().replace(/</g, "&lt;");
-            if (tags !== undefined) updateFields.tags = Array.isArray(tags) ? tags : (tags || '').split(',').map(t => t.trim().replace(/</g, "&lt;")).filter(Boolean);
+            if (title !== undefined) updateFields.title = title;
+            if (description !== undefined) updateFields.description = description;
+            if (tags !== undefined) updateFields.tags = Array.isArray(tags) ? tags : (tags || '').split(',').map(t => t.trim()).filter(Boolean);
             if (link !== undefined) updateFields.link = link;
             if (color !== undefined) updateFields.color = color;
 
-            if (image && image.startsWith('data:image')) {
-                if (image.length > 5 * 1024 * 1024 * 1.33) return res.status(400).json({ success: false, error: 'Foto melebihi 5MB' });
-                const uploadResult = await uploadToCloudinary(image, 'xrpl_projects');
-                updateFields.image = uploadResult.secure_url;
-            } else if (image === null || (image && image.startsWith('http'))) {
-                updateFields.image = image;
+            if (image !== undefined) {
+                if (image && image.startsWith('data:image')) {
+                    const uploadResult = await uploadToCloudinary(image, 'xrpl/projects');
+                    if (uploadResult.success) updateFields.image = uploadResult.url;
+                } else {
+                    updateFields.image = image;
+                }
             }
 
             await collection.updateOne({ _id: new ObjectId(id) }, { $set: updateFields });
-            return res.status(200).json({ success: true, message: 'Projek berhasil diperbarui' });
+            return sendSuccess(res, { message: 'Projek berhasil diperbarui' });
         } catch (error) {
-            console.error("PUT /api/projects error:", error);
-            return res.status(500).json({ success: false, error: 'Server Error: ' + error.message });
+            console.error('Projects PUT error:', error);
+            return sendError(res, 'Server Error: ' + error.message);
         }
     }
 
-    // --- DELETE (Admin) ---
+    // --- DELETE (Admin Only) ---
     if (req.method === 'DELETE') {
-        const user = verifyAuth(req, res, ['admin']);
-        if (!user) return;
+        const admin = requireAdmin(req, res);
+        if (!admin) return;
 
         const { id } = req.query;
-        if (!id) return res.status(400).json({ success: false, error: 'ID diperlukan' });
+        if (!id) return sendError(res, 'ID diperlukan', 400);
+        if (!isValidObjectId(id)) return sendError(res, 'ID tidak valid', 400);
 
         try {
             await collection.deleteOne({ _id: new ObjectId(id) });
-            return res.status(200).json({ success: true, message: 'Projek berhasil dihapus' });
+            return sendSuccess(res, { message: 'Projek berhasil dihapus' });
         } catch (error) {
-            console.error("DELETE /api/projects error:", error);
-            return res.status(500).json({ success: false, error: 'Server Error: ' + error.message });
+            console.error('Projects DELETE error:', error);
+            return sendError(res, 'Server Error: ' + error.message);
         }
     }
 
-    return res.status(405).json({ success: false, error: 'Method Not Allowed' });
+    return sendError(res, 'Method Not Allowed', 405);
 }

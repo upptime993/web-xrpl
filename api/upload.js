@@ -2,54 +2,66 @@ import multiparty from 'multiparty';
 import getDB from './_db.js';
 import { ObjectId } from 'mongodb';
 import fs from 'fs';
-import { uploadToCloudinary } from './_cloudinary.js';
-import { verifyAuth } from './_auth.js';
+import { sendSuccess, sendError } from './_helpers.js';
+import { requireAuth } from './_auth.js';
+import { uploadToCloudinary, validateFileUpload } from './_cloudinary.js';
 
-// Matikan parser bawaan Next.js/Vercel agar multiparty bisa membaca file
+// Matikan parser bawaan agar multiparty bisa membaca file
 export const config = { api: { bodyParser: false } };
 
 export default async function handler(req, res) {
-    if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method Not Allowed' });
+    if (req.method !== 'POST') return sendError(res, 'Method Not Allowed', 405);
 
-    // Proteksi dengan auth middleware
-    const user = verifyAuth(req, res, ['admin']);
-    if (!user) return; // verifyAuth sudah mengirim response error
+    // Auth required
+    const user = requireAuth(req, res);
+    if (!user) return;
 
-    const form = new multiparty.Form();
-    const db = await getDB();
+    const form = new multiparty.Form({ maxFilesSize: 5 * 1024 * 1024 }); // 5MB limit
 
     form.parse(req, async (err, fields, files) => {
-        if (err || !files.photo) return res.status(400).json({ success: false, error: 'Gagal membaca file atau tidak ada file gambar' });
+        if (err) {
+            if (err.code === 'ETOOBIG') {
+                return sendError(res, 'File terlalu besar. Maksimal 5MB.', 400);
+            }
+            return sendError(res, 'Gagal membaca file: ' + err.message, 400);
+        }
 
-        const type = fields.type ? fields.type[0] : null; // students, gallery, dll
+        if (!files.photo || !files.photo[0]) {
+            return sendError(res, 'File foto tidak ditemukan', 400);
+        }
+
+        const type = fields.type ? fields.type[0] : null;
         const entityId = fields.id ? fields.id[0] : null;
         const file = files.photo[0];
 
-        // Validasi tipe file
-        const mimeType = file.headers['content-type'];
-        if (!mimeType.startsWith('image/')) {
-            return res.status(400).json({ success: false, error: 'Format file tidak didukung. Harap unggah gambar (jpg, png, webp).' });
-        }
-
-        // Limit File Size 5MB
-        if (file.size > 5 * 1024 * 1024) {
-             return res.status(400).json({ success: false, error: 'Ukuran foto maksimal 5MB.' });
+        // Validasi file
+        const validation = validateFileUpload(file);
+        if (!validation.valid) {
+            return sendError(res, validation.message, 400);
         }
 
         try {
-            // Ubah file fisik menjadi teks Base64 untuk dikirim ke Cloudinary
+            const db = await getDB();
+
+            // Baca file dan convert ke base64 untuk Cloudinary
             const fileData = fs.readFileSync(file.path);
-            const base64Image = `data:${mimeType};base64,${fileData.toString('base64')}`;
+            const base64Image = `data:${file.headers['content-type']};base64,${fileData.toString('base64')}`;
 
             // Upload ke Cloudinary
-            const uploadResult = await uploadToCloudinary(base64Image, 'xrpl_uploads');
-            const imageUrl = uploadResult.secure_url;
+            const folder = `xrpl/${type || 'uploads'}`;
+            const uploadResult = await uploadToCloudinary(base64Image, folder);
+
+            if (!uploadResult.success) {
+                return sendError(res, uploadResult.message || 'Gagal upload gambar', 500);
+            }
+
+            const imageUrl = uploadResult.url;
 
             if (entityId && entityId !== '0') {
                 // Update foto di database
                 await db.collection(type).updateOne(
                     { _id: new ObjectId(entityId) },
-                    { $set: { photo: imageUrl, image: imageUrl, image_url: imageUrl, updated_at: new Date() } }
+                    { $set: { photo: imageUrl, image_url: imageUrl, updated_at: new Date() } }
                 );
             } else if (type === 'snapshots') {
                 // Insert snapshot baru
@@ -57,22 +69,22 @@ export default async function handler(req, res) {
                     student_id: fields.student_id ? fields.student_id[0] : null,
                     caption: fields.caption ? fields.caption[0] : '',
                     image_url: imageUrl,
-                    created_at: new Date()
-                });
-            } else if (type === 'gallery') {
-                 await db.collection('gallery').insertOne({
-                    title: fields.title ? fields.title[0] : 'Untitled',
-                    category: fields.category ? fields.category[0] : 'other',
-                    image: imageUrl,
-                    color: fields.color ? fields.color[0] : '7b2ff7',
+                    likes: [],
+                    comments: [],
                     created_at: new Date()
                 });
             }
 
-            return res.status(200).json({ success: true, message: 'File berhasil diupload', photo_url: imageUrl });
+            // Cleanup temp file
+            try { fs.unlinkSync(file.path); } catch { /* ignore */ }
+
+            return sendSuccess(res, {
+                message: 'File berhasil diupload',
+                photo_url: imageUrl
+            });
         } catch (error) {
-            console.error("Upload API Error:", error);
-            return res.status(500).json({ success: false, error: 'Terjadi kesalahan sistem saat mengunggah: ' + error.message });
+            console.error('Upload error:', error);
+            return sendError(res, 'Server Error: ' + error.message);
         }
     });
 }
