@@ -3,12 +3,35 @@
 // Full MongoDB API — No localStorage fallback
 // ============================================================
 
+// ── GLOBAL LOADER ─────────────────────────────────────────────
+function showLoading() {
+    const loader = document.getElementById('global-loader');
+    if (loader) {
+        loader.classList.remove('hidden');
+        setTimeout(() => loader.classList.remove('opacity-0'), 10);
+    }
+}
+function hideLoading() {
+    const loader = document.getElementById('global-loader');
+    if (loader) {
+        loader.classList.add('opacity-0');
+        setTimeout(() => loader.classList.add('hidden'), 300);
+    }
+}
+
 // ── HELPER FETCH ────────────────────────────────────────────
 async function safeFetch(url, options = {}) {
-    const res = await fetch(url, options);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
-    return data;
+    const isMutation = options.method && options.method !== 'GET';
+    if (isMutation) showLoading();
+    
+    try {
+        const res = await fetch(url, options);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+        return data;
+    } finally {
+        if (isMutation) hideLoading();
+    }
 }
 
 // ── AUTH CHECK (via API, not localStorage) ──────────────────
@@ -1077,6 +1100,8 @@ function uploadMyPhoto(input) {
 
     showToast('⏳ Mengupload foto...', 'info');
 
+    showLoading();
+
     fetch('api/upload', { method: 'POST', body: formData })
     .then(res => res.json())
     .then(data => {
@@ -1090,7 +1115,8 @@ function uploadMyPhoto(input) {
     })
     .catch(err => {
         showToast('Kesalahan koneksi saat upload.', 'error');
-    });
+    })
+    .finally(() => hideLoading());
 }
 
 function saveMyProfile(e) {
@@ -1186,6 +1212,8 @@ function saveMySnapshot(e) {
     formData.append('caption', caption);
     formData.append('student_id', studentId);
 
+    showLoading();
+
     fetch('api/snapshots', { method: 'POST', body: formData })
     .then(res => res.json())
     .then(res => {
@@ -1203,7 +1231,8 @@ function saveMySnapshot(e) {
         btn.disabled = false;
         btn.textContent = '📤 Upload';
         showToast('Gagal koneksi ke server!', 'error');
-    });
+    })
+    .finally(() => hideLoading());
 }
 
 function deleteMySnapshot(id) {
