@@ -47,12 +47,20 @@ let _authRedirecting = false;
             document.querySelectorAll('.student-only').forEach(el => el.classList.remove('hidden'));
             window.CURRENT_ROLE = 'student';
             window.CURRENT_USER_ID = user.id;
+            // Show student settings, hide admin settings
+            document.getElementById('settings-admin').classList.add('hidden');
+            document.getElementById('settings-student').classList.remove('hidden');
         } else {
             document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
             document.querySelectorAll('.student-only').forEach(el => el.classList.add('hidden'));
             window.CURRENT_ROLE = 'admin';
             window.CURRENT_USER_ID = user.id;
+            // Show admin settings, hide student settings
+            document.getElementById('settings-admin').classList.remove('hidden');
+            document.getElementById('settings-student').classList.add('hidden');
         }
+        // Now trigger default tab selection
+        initDefaultTab();
     } catch (error) {
         // Network error / server timeout → JANGAN redirect, cukup log
         // Ini yang bikin loop relog sebelumnya!
@@ -127,14 +135,17 @@ function closeSidebar() {
 }
 document.getElementById('sidebar-overlay').addEventListener('click', closeSidebar);
 
-// INIT TAB
-document.addEventListener('DOMContentLoaded', () => {
+// INIT TAB — wait for auth check to complete before deciding default tab
+let _initTabDone = false;
+function initDefaultTab() {
+    if (_initTabDone) return;
+    _initTabDone = true;
     if (window.CURRENT_ROLE === 'student') {
         switchTab('my-profile');
     } else {
         switchTab('overview');
     }
-});
+}
 
 // ── MODAL HELPERS ─────────────────────────────────────────────
 function openModal(id) { document.getElementById(id).classList.add('open'); }
@@ -384,8 +395,8 @@ function deleteStudent(id) {
 let _strukturCache = [];
 
 function loadStruktur() {
-    const el = document.getElementById('struktur-admin');
-    el.innerHTML = '<p class="text-gray-500 text-sm italic text-center py-8"><span class="animate-pulse">⏳ Memuat struktur...</span></p>';
+    const el = document.getElementById('struktur-grid');
+    el.innerHTML = '<p class="text-gray-500 text-sm italic text-center py-8 col-span-full"><span class="animate-pulse">⏳ Memuat struktur...</span></p>';
 
     safeFetch('api/struktur')
         .then(data => {
@@ -393,30 +404,38 @@ function loadStruktur() {
             renderStrukturAdmin(_strukturCache);
         })
         .catch(err => {
-            el.innerHTML = '<p class="text-red-400 text-sm text-center py-8">❌ Gagal memuat. Cek koneksi database.</p>';
+            el.innerHTML = '<p class="text-red-400 text-sm text-center py-8 col-span-full">❌ Gagal memuat. Cek koneksi database.</p>';
         });
 }
 
 function renderStrukturAdmin(data) {
-    const el = document.getElementById('struktur-admin');
+    const el = document.getElementById('struktur-grid');
     if (!data || data.length === 0) {
-        el.innerHTML = '<p class="text-gray-500 text-sm italic text-center py-8">Belum ada data struktur.</p>';
+        el.innerHTML = '<p class="text-gray-500 text-sm italic text-center py-8 col-span-full">Belum ada data struktur.</p>';
         return;
     }
     const levelLabels = { 0: 'Wali Kelas', 0.5: 'Guru Produktif', 1: 'Ketua/Wakil', 2: 'Staff', 3: 'Anggota' };
     el.innerHTML = data.map(s => {
         const mongoId = s._id ? `'${s._id.toString()}'` : s.id;
         const levelLabel = levelLabels[s.level] || `Level ${s.level}`;
+        const photoHtml = s.photo
+            ? `<img src="${s.photo}" alt="${escHtml(s.name)}" class="w-10 h-10 rounded-full object-cover border-2" style="border-color:#${s.color||'00d4ff'}50">`
+            : `<div style="width:40px;height:40px;border-radius:50%;background:#${s.color||'00d4ff'};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;flex-shrink:0;">${(s.name||'?').split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase()}</div>`;
         return `
-        <div class="flex items-center gap-4 border border-white/5 rounded-xl p-3 hover:bg-white/5 transition-colors">
-            ${getAvatarHtml(s, 40)}
-            <div class="flex-1 min-w-0">
-                <p class="text-white font-semibold text-sm truncate">${escHtml(s.name)}</p>
-                <p class="text-xs"><span style="color:#${s.color||'00d4ff'}">${escHtml(s.jabatan)}</span> · <span class="text-gray-500">${levelLabel}</span></p>
+        <div class="glass rounded-2xl p-4 glass-hover">
+            <div class="flex items-center gap-3 mb-3">
+                ${photoHtml}
+                <div class="flex-1 min-w-0">
+                    <p class="text-white font-semibold text-sm truncate">${escHtml(s.name)}</p>
+                    <p class="text-xs" style="color:#${s.color||'00d4ff'}">${escHtml(s.jabatan)}</p>
+                </div>
             </div>
-            <div class="flex gap-2 flex-shrink-0">
-                <button class="btn-edit text-xs" onclick="editStruktur(${mongoId})">✏️ Edit</button>
-                <button class="btn-danger text-xs" onclick="deleteStruktur(${mongoId})">🗑️</button>
+            <div class="flex items-center justify-between">
+                <span class="text-gray-500 text-xs">${levelLabel}</span>
+                <div class="flex gap-2">
+                    <button class="btn-edit text-xs" onclick="editStruktur(${mongoId})">✏️ Edit</button>
+                    <button class="btn-danger text-xs" onclick="deleteStruktur(${mongoId})">🗑️</button>
+                </div>
             </div>
         </div>`;
     }).join('');
@@ -428,19 +447,26 @@ function openStrukturModal(id = null) {
     document.getElementById('struktur-form').reset();
     document.getElementById('struktur-id').value = '';
     currentStrukturPhotoData = null;
-    document.getElementById('struktur-foto-preview-wrap').innerHTML = '<p class="text-3xl mb-1">📷</p><p class="text-xs text-gray-500">Klik atau drag foto</p>';
+    document.getElementById('struktur-photo-preview').src = '';
+    document.getElementById('struktur-photo-preview').classList.add('hidden');
+    document.getElementById('struktur-photo-clear').classList.add('hidden');
+    document.getElementById('struktur-photo-base64').value = '';
+    document.getElementById('struktur-modal-title').textContent = id ? 'Edit Jabatan' : 'Tambah Jabatan';
 
     if (id) {
         const s = _strukturCache.find(x => (x._id && x._id.toString() === String(id)) || x.id === id);
         if (s) {
             document.getElementById('struktur-id').value = s._id ? s._id.toString() : (s.id || '');
-            document.getElementById('struktur-nama').value = s.name;
+            document.getElementById('struktur-name').value = s.name;
             document.getElementById('struktur-jabatan').value = s.jabatan;
             document.getElementById('struktur-level').value = s.level;
             document.getElementById('struktur-color').value = s.color || '00d4ff';
+            setStrukturColor(s.color || '00d4ff', document.querySelector(`.str-color-pick[data-color="${s.color||'00d4ff'}"]`));
             if (s.photo) {
                 currentStrukturPhotoData = s.photo;
-                document.getElementById('struktur-foto-preview-wrap').innerHTML = `<img src="${s.photo}" class="max-h-32 rounded-lg mx-auto">`;
+                document.getElementById('struktur-photo-preview').src = s.photo;
+                document.getElementById('struktur-photo-preview').classList.remove('hidden');
+                document.getElementById('struktur-photo-clear').classList.remove('hidden');
             }
         }
     }
@@ -449,22 +475,38 @@ function openStrukturModal(id = null) {
 
 function editStruktur(id) { openStrukturModal(id); }
 
-function previewStrukturFoto(input) {
+function previewStrukturPhoto(input) {
     const file = input.files[0]; if (!file) return;
     if (file.size > 5 * 1024 * 1024) { showToast('File terlalu besar! Maks 5MB.', 'error'); return; }
     const reader = new FileReader();
     reader.onload = e => {
         currentStrukturPhotoData = e.target.result;
-        document.getElementById('struktur-foto-preview-wrap').innerHTML = `<img src="${e.target.result}" class="max-h-32 rounded-lg mx-auto">`;
+        document.getElementById('struktur-photo-preview').src = e.target.result;
+        document.getElementById('struktur-photo-preview').classList.remove('hidden');
+        document.getElementById('struktur-photo-clear').classList.remove('hidden');
     };
     reader.readAsDataURL(file);
+}
+
+function clearStrukturPhoto() {
+    currentStrukturPhotoData = null;
+    document.getElementById('struktur-photo-preview').src = '';
+    document.getElementById('struktur-photo-preview').classList.add('hidden');
+    document.getElementById('struktur-photo-clear').classList.add('hidden');
+    document.getElementById('struktur-photo').value = '';
+}
+
+function setStrukturColor(color, el) {
+    document.getElementById('struktur-color').value = color;
+    document.querySelectorAll('.str-color-pick').forEach(c => c.style.borderColor = 'transparent');
+    if (el) el.style.borderColor = 'white';
 }
 
 document.getElementById('struktur-form').addEventListener('submit', function(e) {
     e.preventDefault();
     const mongoId = document.getElementById('struktur-id').value.trim();
     const data = {
-        name: document.getElementById('struktur-nama').value.trim(),
+        name: document.getElementById('struktur-name').value.trim(),
         jabatan: document.getElementById('struktur-jabatan').value.trim(),
         level: parseFloat(document.getElementById('struktur-level').value),
         color: document.getElementById('struktur-color').value.trim() || '00d4ff',
@@ -505,8 +547,8 @@ let _projectsCache = [];
 let currentProjectImageData = null;
 
 function loadProjects() {
-    const el = document.getElementById('projects-admin');
-    el.innerHTML = '<p class="text-gray-500 text-sm italic text-center py-8"><span class="animate-pulse">⏳ Memuat projek...</span></p>';
+    const el = document.getElementById('projects-grid');
+    el.innerHTML = '<p class="text-gray-500 text-sm italic text-center py-8 col-span-full"><span class="animate-pulse">⏳ Memuat projek...</span></p>';
 
     safeFetch('api/projects?limit=200')
         .then(data => {
@@ -514,14 +556,14 @@ function loadProjects() {
             renderProjectsAdmin(_projectsCache);
         })
         .catch(err => {
-            el.innerHTML = '<p class="text-red-400 text-sm text-center py-8">❌ Gagal memuat projek.</p>';
+            el.innerHTML = '<p class="text-red-400 text-sm text-center py-8 col-span-full">❌ Gagal memuat projek.</p>';
         });
 }
 
 function renderProjectsAdmin(data) {
-    const el = document.getElementById('projects-admin');
+    const el = document.getElementById('projects-grid');
     if (!data || data.length === 0) {
-        el.innerHTML = '<p class="text-gray-500 text-sm italic text-center py-8">Belum ada projek. Tambahkan sekarang!</p>';
+        el.innerHTML = '<p class="text-gray-500 text-sm italic text-center py-8 col-span-full">Belum ada projek. Tambahkan sekarang!</p>';
         return;
     }
     el.innerHTML = data.map(p => {
@@ -529,16 +571,16 @@ function renderProjectsAdmin(data) {
         const imgSrc = (p.image && p.image.length > 0) ? p.image : `https://placehold.co/300x180/${p.color || '00d4ff'}/fff?text=${encodeURIComponent(p.title)}`;
         const tags = (p.tags || []).map(t => `<span class="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-gray-300">${escHtml(t)}</span>`).join('');
         return `
-        <div class="flex items-center gap-4 border border-white/5 rounded-xl p-3 hover:bg-white/5 transition-colors">
-            <img src="${imgSrc}" alt="${escHtml(p.title)}" class="w-20 h-14 rounded-lg object-cover flex-shrink-0" loading="lazy">
-            <div class="flex-1 min-w-0">
-                <p class="text-white font-semibold text-sm truncate">${escHtml(p.title)}</p>
-                <p class="text-gray-400 text-xs truncate mb-1">${escHtml(p.description || '')}</p>
-                <div class="flex gap-1 flex-wrap">${tags}</div>
-            </div>
-            <div class="flex gap-2 flex-shrink-0">
-                <button class="btn-edit text-xs" onclick="editProject(${mongoId})">✏️ Edit</button>
-                <button class="btn-danger text-xs" onclick="deleteProject(${mongoId})">🗑️</button>
+        <div class="glass rounded-2xl overflow-hidden glass-hover">
+            <img src="${imgSrc}" alt="${escHtml(p.title)}" class="w-full h-36 object-cover" loading="lazy">
+            <div class="p-4">
+                <p class="text-white font-semibold text-sm truncate mb-1">${escHtml(p.title)}</p>
+                <p class="text-gray-400 text-xs truncate mb-2">${escHtml(p.description || '')}</p>
+                <div class="flex gap-1 flex-wrap mb-3">${tags}</div>
+                <div class="flex gap-2">
+                    <button class="btn-edit text-xs flex-1" onclick="editProject(${mongoId})">✏️ Edit</button>
+                    <button class="btn-danger text-xs" onclick="deleteProject(${mongoId})">🗑️</button>
+                </div>
             </div>
         </div>`;
     }).join('');
@@ -868,10 +910,56 @@ function changePassword(e) {
     if (newPw !== confirmPw) return showToast('Konfirmasi password tidak cocok!', 'error');
     if (newPw.length < 6) return showToast('Password baru minimal 6 karakter!', 'error');
 
-    // Verify old password via API login check
     const user = JSON.parse(localStorage.getItem('xrpl_admin_user') || '{}');
     showToast('Fitur ganti password admin akan segera tersedia.', 'info');
     document.getElementById('change-password-form').reset();
+}
+
+function changeStudentPassword(e) {
+    e.preventDefault();
+    const oldPw = document.getElementById('student-old-password').value;
+    const newPw = document.getElementById('student-new-password').value;
+    const confirmPw = document.getElementById('student-confirm-password').value;
+
+    if (newPw !== confirmPw) return showToast('Konfirmasi password tidak cocok!', 'error');
+    if (newPw.length < 6) return showToast('Password baru minimal 6 karakter!', 'error');
+
+    const user = JSON.parse(localStorage.getItem('xrpl_admin_user') || '{}');
+    if (!user.username) return showToast('Data user tidak ditemukan.', 'error');
+
+    safeFetch('api/auth', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: user.username, newPassword: newPw, oldPassword: oldPw })
+    })
+    .then(() => {
+        showToast('Password berhasil diubah!');
+        document.getElementById('student-password-form').reset();
+    })
+    .catch(err => showToast(err.message || 'Gagal mengubah password.', 'error'));
+}
+
+function changeStudentUsername(e) {
+    e.preventDefault();
+    const newUsername = document.getElementById('student-new-username').value.trim();
+    if (!newUsername) return showToast('Username baru wajib diisi!', 'error');
+    if (newUsername.length < 3) return showToast('Username minimal 3 karakter!', 'error');
+
+    const user = JSON.parse(localStorage.getItem('xrpl_admin_user') || '{}');
+    const targetId = window.CURRENT_MONGO_ID || window.CURRENT_USER_ID;
+
+    safeFetch(`api/students?id=${targetId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: newUsername })
+    })
+    .then(() => {
+        user.username = newUsername;
+        localStorage.setItem('xrpl_admin_user', JSON.stringify(user));
+        showToast('Username berhasil diubah!');
+        document.getElementById('student-username-form').reset();
+    })
+    .catch(err => showToast(err.message || 'Gagal mengubah username.', 'error'));
 }
 
 function exportData() {

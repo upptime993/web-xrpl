@@ -6,7 +6,7 @@
     <meta name="description" content="Website profil kelas X RPL - Rekayasa Perangkat Lunak">
     <meta name="keywords" content="RPL, Rekayasa Perangkat Lunak, kelas X, profil kelas, coding, sekolah">
     <meta property="og:title" content="X RPL - Rekayasa Perangkat Lunak">
-    <meta property="og:description" content="Profil kelas X RPL Angkatan 2024/2025">
+    <meta property="og:description" content="Profil kelas X RPL Angkatan 2025/2026">
     <title>X RPL | Rekayasa Perangkat Lunak</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -231,7 +231,7 @@
                     <span class="bg-gradient-to-r from-cyber-blue to-electric-purple bg-clip-text text-transparent">X RPL</span>
                 </h1>
                 <h2 class="text-xl md:text-2xl text-text-secondary font-light mb-8 opacity-0 animate-fade-in-up" style="animation-delay: 0.5s;">
-                    Rekayasa Perangkat Lunak <span class="hidden sm:inline">|</span><br class="sm:hidden"> Angkatan 2024/2025
+                    Rekayasa Perangkat Lunak <span class="hidden sm:inline">|</span><br class="sm:hidden"> Angkatan 2025/2026
                 </h2>
                 
                 <div class="h-8 md:h-10 mb-10 text-lg md:text-2xl font-mono text-white">
@@ -581,7 +581,7 @@
             </div>
 
             <div class="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-                <p class="text-xs text-text-secondary">© 2024 Kelas X RPL. All rights reserved.</p>
+                <p class="text-xs text-text-secondary">© 2025 Kelas X RPL. All rights reserved.</p>
                 <button onclick="window.scrollTo({top: 0, behavior: 'smooth'})" class="text-cyber-blue text-sm hover:underline font-medium">Kembali ke Atas ↑</button>
             </div>
         </div>
@@ -682,10 +682,10 @@
         const isLoggedIn = localStorage.getItem('xrpl_admin_logged_in') === 'true';
         const btnHtml = isLoggedIn
             ? `<a href="dashboard.html" class="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold text-dark-bg bg-gradient-to-r from-cyber-blue to-electric-purple hover:scale-105 transition-transform shadow-[0_0_15px_rgba(0,212,255,0.3)]">⚡ Dashboard</a>`
-            : `<a href="login.html" class="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold border border-cyber-blue/40 text-cyber-blue hover:bg-cyber-blue/10 transition-all">🔐 Login Admin</a>`;
+            : `<a href="login.html" class="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold border border-cyber-blue/40 text-cyber-blue hover:bg-cyber-blue/10 transition-all">🔐 Login</a>`;
         const mobileHtml = isLoggedIn
             ? `<a href="dashboard.html" class="text-xl font-heading font-bold bg-gradient-to-r from-cyber-blue to-electric-purple bg-clip-text text-transparent">⚡ Dashboard</a>`
-            : `<a href="login.html" class="text-xl font-heading text-cyber-blue hover:text-white transition-colors">🔐 Login Admin</a>`;
+            : `<a href="login.html" class="text-xl font-heading text-cyber-blue hover:text-white transition-colors">🔐 Login</a>`;
         const navDesktop = document.getElementById('nav-auth-btn');
         const navMobile  = document.getElementById('mobile-auth-btn');
         if (navDesktop) navDesktop.innerHTML = btnHtml;

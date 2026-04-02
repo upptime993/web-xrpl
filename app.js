@@ -61,8 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Students
             if (studentRes.status === 'fulfilled' && studentRes.value.data) {
-                studentsData = studentRes.value.data.map(s => ({
-                    id: s.sort_order || parseInt(String(s._id).slice(-4), 16) % 100 || 1,
+                studentsData = studentRes.value.data.map((s, i) => ({
+                    id: s.sort_order || (i + 1),
                     _id: s._id,
                     name: s.name || s.full_name,
                     quote: s.quote || '',
