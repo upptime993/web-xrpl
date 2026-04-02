@@ -1088,11 +1088,28 @@ function loadMyProfile() {
         });
 }
 
-function uploadMyPhoto(input) {
-    const file = input.files[0];
+async function uploadMyPhoto(input) {
+    let file = input.files[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { showToast('File terlalu besar! Maks 5MB.', 'error'); return; }
-    
+
+    // Jika file > 5MB, kompres
+    if (file.size > 5 * 1024 * 1024) {
+        showToast('File besar, mengompres...', 'info');
+        try {
+            const options = {
+                maxSizeMB: 5,
+                maxWidthOrHeight: 1920, // Optional: resize jika perlu
+                useWebWorker: true,
+                quality: 0.9 // Kualitas tinggi untuk minimize loss
+            };
+            file = await imageCompression(file, options);
+            showToast('Kompresi selesai!', 'success');
+        } catch (error) {
+            showToast('Gagal kompres gambar: ' + error.message, 'error');
+            return;
+        }
+    }
+
     const formData = new FormData();
     formData.append('type', 'students');
     formData.append('id', window.CURRENT_MONGO_ID || window.CURRENT_USER_ID);
@@ -1182,7 +1199,6 @@ function openMySnapshotModal() {
 function previewSnapshotImage(input) {
     const file = input.files[0];
     if(file) {
-        if (file.size > 5 * 1024 * 1024) { showToast('File terlalu besar! Maks 5MB.', 'error'); return; }
         const reader = new FileReader();
         reader.onload = e => {
             const preview = document.getElementById('snapshot-preview');
@@ -1194,13 +1210,31 @@ function previewSnapshotImage(input) {
     }
 }
 
-function saveMySnapshot(e) {
+async function saveMySnapshot(e) {
     e.preventDefault();
     const btn = document.getElementById('snapshot-save-btn');
-    const imageFile = document.getElementById('snapshot-input').files[0];
+    let imageFile = document.getElementById('snapshot-input').files[0];
     const caption = document.getElementById('snapshot-caption').value;
 
     if (!imageFile) return showToast('Pilih foto terlebih dahulu!', 'error');
+
+    // Jika file > 5MB, kompres
+    if (imageFile.size > 5 * 1024 * 1024) {
+        showToast('File besar, mengompres...', 'info');
+        try {
+            const options = {
+                maxSizeMB: 5,
+                maxWidthOrHeight: 1920,
+                useWebWorker: true,
+                quality: 0.9
+            };
+            imageFile = await imageCompression(imageFile, options);
+            showToast('Kompresi selesai!', 'success');
+        } catch (error) {
+            showToast('Gagal kompres gambar: ' + error.message, 'error');
+            return;
+        }
+    }
 
     btn.disabled = true;
     btn.textContent = '⏳ Uploading...';
